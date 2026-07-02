@@ -7,7 +7,7 @@ Personal scripts for Omarchy/Hyprland. Commands live in `src/`, keybindings live
 Clone the repository, enter the directory, and run the installer:
 
 ```bash
-git clone git@github.com:<user>/omarchy-scripts.git ~/projects/omarchy-scripts
+git clone git@github.com:MarlonPassos-git/omarchy-scripts.git ~/projects/omarchy-scripts
 cd ~/projects/omarchy-scripts
 ./scripts/install
 ```
