@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+load_screenshot_directory() {
+  # Omarchy users can override screenshot targets without editing this script.
+  [[ -f ~/.config/user-dirs.dirs ]] && source ~/.config/user-dirs.dirs
+  printf '%s\n' "${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}"
+}
+
+active_window_geometry() {
+  local geometry
+  geometry=$(hyprctl activewindow -j | jq -er '
+    if (.at | type == "array") and (.size | type == "array") then
+      "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"
+    else
+      error("activewindow must include at:[x,y] and size:[w,h]")
+    end
+  ')
+  printf '%s\n' "$geometry"
+}
+
+save_active_window_screenshot() {
+  local output_dir="$1"
+  local geometry="$2"
+  local filepath="$output_dir/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png"
+
+  mkdir -p "$output_dir"
+  grim -g "$geometry" "$filepath"
+  # Screenshot workflows usually need immediate paste into chat or docs.
+  wl-copy <"$filepath"
+  printf '%s\n' "$filepath"
+}
+
+main() {
+  local output_dir geometry filepath
+
+  output_dir=$(load_screenshot_directory)
+  geometry=$(active_window_geometry)
+  filepath=$(save_active_window_screenshot "$output_dir" "$geometry")
+  notify-send "Active window screenshot saved" "$filepath" -t 3000 -i "$filepath"
+}
+
+main "$@"

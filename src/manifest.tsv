@@ -1,0 +1,3 @@
+# script	title	description	modifiers	key	dependencies
+omarchy-capture-active-window	Active window screenshot	Capture the active Hyprland window, save it to Pictures, copy it to the clipboard, and notify with the saved path.	SUPER SHIFT	PRINT	hyprctl,jq,grim,wl-copy,notify-send
+omarchy-layout-main-two-stack	Main + side stack layout	Toggle the current workspace between dwindle and a master layout with the focused window on the left and the other windows stacked on the right.	SUPER ALT	L	hyprctl,jq,notify-send

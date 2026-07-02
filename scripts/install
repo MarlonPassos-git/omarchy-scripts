@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BEGIN_MARKER="# BEGIN omarchy-scripts"
+END_MARKER="# END omarchy-scripts"
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+MANIFEST="$REPO_ROOT/src/manifest.tsv"
+
+hypr_bindings_file() {
+  printf '%s\n' "${HYPR_BINDINGS_FILE:-$HOME/.config/hypr/bindings.conf}"
+}
+
+display_path() {
+  local path="$1"
+  local home_prefix="$HOME/"
+
+  if [[ "$path" == "$home_prefix"* ]]; then
+    printf '~/%s\n' "${path#"$home_prefix"}"
+    return
+  fi
+
+  printf '%s\n' "$path"
+}
+
+is_manifest_row() {
+  [[ -n "${1:-}" && "${1:0:1}" != "#" ]]
+}
+
+ensure_script_permissions() {
+  local script title description modifiers key dependencies
+
+  while IFS=$'\t' read -r script title description modifiers key dependencies; do
+    is_manifest_row "$script" || continue
+    chmod +x "$REPO_ROOT/src/$script"
+  done <"$MANIFEST"
+}
+
+render_binding_line() {
+  local script="$1"
+  local title="$2"
+  local modifiers="$4"
+  local key="$5"
+  local command_path
+
+  command_path=$(display_path "$REPO_ROOT/src/$script")
+  printf 'bindd = %s, %s, %s, exec, %s\n' "$modifiers" "$key" "$title" "$command_path"
+}
+
+render_bindings_block() {
+  local script title description modifiers key dependencies
+
+  printf '%s\n' "$BEGIN_MARKER"
+  printf '# Managed by ./scripts/install. Edit src/manifest.tsv, then rerun install.\n'
+  while IFS=$'\t' read -r script title description modifiers key dependencies; do
+    is_manifest_row "$script" || continue
+    render_binding_line "$script" "$title" "$description" "$modifiers" "$key" "$dependencies"
+  done <"$MANIFEST"
+  printf '%s\n' "$END_MARKER"
+}
+
+strip_existing_bindings() {
+  local file="$1"
+
+  awk -v begin="$BEGIN_MARKER" -v end="$END_MARKER" '
+    $0 == begin { skip = 1; next }
+    $0 == end { skip = 0; next }
+    skip { next }
+    /omarchy-capture-active-window/ { next }
+    /omarchy-layout-main-two-stack/ { next }
+    /# Arrange current workspace like a main pane with two side panes\./ { next }
+    { print }
+  ' "$file"
+}
+
+trim_trailing_blank_lines() {
+  awk '
+    NF { last = NR }
+    { lines[NR] = $0 }
+    END { for (i = 1; i <= last; i++) print lines[i] }
+  '
+}
+
+backup_bindings_file() {
+  local file="$1"
+
+  [[ -s "$file" ]] || return
+  cp "$file" "$file.bak.omarchy-scripts-$(date +'%Y%m%d%H%M%S')"
+}
+
+install_bindings() {
+  local file tmp
+
+  file=$(hypr_bindings_file)
+  mkdir -p "$(dirname "$file")"
+  touch "$file"
+  backup_bindings_file "$file"
+  tmp=$(mktemp)
+  strip_existing_bindings "$file" | trim_trailing_blank_lines >"$tmp"
+  { cat "$tmp"; printf '\n\n'; render_bindings_block; } >"$file"
+  rm -f "$tmp"
+}
+
+reload_hyprland() {
+  command -v hyprctl >/dev/null || return
+  hyprctl reload >/dev/null 2>&1 || return 0
+  hyprctl configerrors
+}
+
+main() {
+  ensure_script_permissions
+  install_bindings
+  reload_hyprland
+  printf 'Installed omarchy-scripts keybindings.\n'
+}
+
+main "$@"

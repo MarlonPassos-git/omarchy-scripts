@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BEGIN_MARKER="# BEGIN omarchy-scripts"
+END_MARKER="# END omarchy-scripts"
+
+hypr_bindings_file() {
+  printf '%s\n' "${HYPR_BINDINGS_FILE:-$HOME/.config/hypr/bindings.conf}"
+}
+
+strip_existing_bindings() {
+  local file="$1"
+
+  awk -v begin="$BEGIN_MARKER" -v end="$END_MARKER" '
+    $0 == begin { skip = 1; next }
+    $0 == end { skip = 0; next }
+    skip { next }
+    /omarchy-capture-active-window/ { next }
+    /omarchy-layout-main-two-stack/ { next }
+    /# Arrange current workspace like a main pane with two side panes\./ { next }
+    { print }
+  ' "$file"
+}
+
+trim_trailing_blank_lines() {
+  awk '
+    NF { last = NR }
+    { lines[NR] = $0 }
+    END { for (i = 1; i <= last; i++) print lines[i] }
+  '
+}
+
+backup_bindings_file() {
+  local file="$1"
+
+  [[ -s "$file" ]] || return
+  cp "$file" "$file.bak.omarchy-scripts-$(date +'%Y%m%d%H%M%S')"
+}
+
+uninstall_bindings() {
+  local file tmp
+
+  file=$(hypr_bindings_file)
+  [[ -f "$file" ]] || return
+  backup_bindings_file "$file"
+  tmp=$(mktemp)
+  strip_existing_bindings "$file" | trim_trailing_blank_lines >"$tmp"
+  cat "$tmp" >"$file"
+  rm -f "$tmp"
+}
+
+reload_hyprland() {
+  command -v hyprctl >/dev/null || return
+  hyprctl reload >/dev/null 2>&1 || return 0
+  hyprctl configerrors
+}
+
+main() {
+  uninstall_bindings
+  reload_hyprland
+  printf 'Uninstalled omarchy-scripts keybindings.\n'
+}
+
+main "$@"
