@@ -31,13 +31,46 @@ save_active_window_screenshot() {
   printf '%s\n' "$filepath"
 }
 
+open_screenshot_preview() {
+  local filepath="$1"
+  local viewer
+
+  viewer=$(screenshot_preview_command) || return 0
+  "$viewer" "$filepath" >/dev/null 2>&1 &
+}
+
+screenshot_preview_command() {
+  if command -v imv >/dev/null; then
+    printf 'imv\n'
+    return
+  fi
+
+  command -v xdg-open >/dev/null && printf 'xdg-open\n'
+}
+
+display_path() {
+  local filepath="$1"
+  local home_prefix="$HOME/"
+
+  if [[ $filepath == "$home_prefix"* ]]; then
+    printf '~/%s\n' "${filepath#"$home_prefix"}"
+    return
+  fi
+
+  printf '%s\n' "$filepath"
+}
+
 main() {
-  local output_dir geometry filepath
+  local output_dir geometry filepath notification_path
 
   output_dir=$(load_screenshot_directory)
   geometry=$(active_window_geometry)
   filepath=$(save_active_window_screenshot "$output_dir" "$geometry")
-  notify-send "Active window screenshot saved" "$filepath" -t 3000 -i "$filepath"
+  notification_path=$(display_path "$filepath")
+  open_screenshot_preview "$filepath"
+  notify-send "Active window screenshot saved" "$notification_path" -t 3000 -i "$filepath"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
