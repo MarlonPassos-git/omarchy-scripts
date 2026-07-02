@@ -38,7 +38,7 @@ Este repositório guarda scripts pessoais usados por Omarchy/Hyprland.
 ## Documentação
 
 - Todo script novo precisa aparecer no `README.md`.
-- A tabela de comandos deve listar título, descrição, comando, atalho, script e dependências.
+- A tabela de comandos deve listar título, descrição, atalho, script e dependências.
 - Comentar no código apenas riscos, decisões e efeitos colaterais que não são óbvios.
 
 ## Validação
