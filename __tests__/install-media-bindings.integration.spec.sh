@@ -36,7 +36,7 @@ repo_command_path() {
   printf '~/%s/src/%s\n' "$repo_path" "$script"
 }
 
-test_install_generates_spotify_media_bindings() {
+test_install_generates_media_bindings_and_master_layout_config() {
   local tmpdir bindings_file media_key spotify_command
   tmpdir=$(mktemp -d)
   bindings_file="$tmpdir/bindings.conf"
@@ -59,9 +59,10 @@ exit 0'
   assert_file_contains "$bindings_file" "bindld = , XF86AudioNext, Next track, exec, $media_key next"
   assert_file_contains "$bindings_file" "bindeld = , XF86AudioRaiseVolume, Volume up, exec, $media_key volume-up"
   assert_file_contains "$bindings_file" "bindd = SUPER SHIFT, M, Spotify TUI, exec, $spotify_command"
+  assert_file_contains "$bindings_file" 'new_status = slave'
   assert_file_not_contains "$bindings_file" 'exec, spotify-media-key'
   assert_file_not_contains "$bindings_file" 'omarchy-launch-or-focus-tui spotify-tui'
 }
 
-test_install_generates_spotify_media_bindings
-printf 'ok - install media bindings\n'
+test_install_generates_media_bindings_and_master_layout_config
+printf 'ok - install media bindings and master layout config\n'
