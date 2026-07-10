@@ -107,6 +107,10 @@ render_binding_lines() {
 render_bindings_block() {
   printf '%s\n' "$BEGIN_MARKER"
   printf '# Managed by ./scripts/install. Edit src/manifest.tsv, then rerun install.\n'
+  printf '# Keep new windows in the side stack; Omarchy promotes them to master by default.\n'
+  printf 'master {\n'
+  printf '    new_status = slave\n'
+  printf '}\n'
   render_unbind_lines
   render_binding_lines
   printf '%s\n' "$END_MARKER"
