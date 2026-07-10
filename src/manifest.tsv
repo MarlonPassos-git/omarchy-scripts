@@ -1,3 +1,13 @@
-# script	title	description	modifiers	key	dependencies
-omarchy-capture-active-window	Active window screenshot	Capture the active Hyprland window, save it to Pictures, copy it to the clipboard, open a preview, and notify with the saved path.	SUPER SHIFT	PRINT	hyprctl,jq,grim,wl-copy,imv,xdg-open,notify-send
+# script	title	description	modifiers	key	dependencies	args
+omarchy-capture-active-window	Active window screenshot	Capture the active Hyprland window, save it to Pictures, copy it to the clipboard, and notify with the saved path.	SUPER SHIFT	PRINT	hyprctl,jq,grim,wl-copy,notify-send
 omarchy-layout-main-two-stack	Main + side stack layout	Toggle the current workspace between dwindle and a master layout with the focused window on the left and the other windows stacked on the right.	SUPER ALT	L	hyprctl,jq,notify-send
+omarchy-spotify	Spotify TUI	Open or focus the spotify_player TUI while playback stays on the daemon device.	SUPER SHIFT	M	spotify_player,omarchy-launch-or-focus-tui	-
+omarchy-spotify-media-key	Volume up	Route volume up to spotify_player when Spotify is active; otherwise use Omarchy system volume.	NONE	XF86AudioRaiseVolume	spotify_player,jq,playerctl,omarchy-swayosd-client,systemctl,flock	volume-up
+omarchy-spotify-media-key	Volume down	Route volume down to spotify_player when Spotify is active; otherwise use Omarchy system volume.	NONE	XF86AudioLowerVolume	spotify_player,jq,playerctl,omarchy-swayosd-client,systemctl,flock	volume-down
+omarchy-spotify-media-key	Next track	Route next to spotify_player when Spotify has playback focus; otherwise use the active media player.	NONE	XF86AudioNext	spotify_player,jq,playerctl,omarchy-swayosd-client,systemctl,flock	next
+omarchy-spotify-media-key	Play/pause	Route play/pause to spotify_player when Spotify has playback focus; otherwise use the active media player.	NONE	XF86AudioPlay	spotify_player,jq,playerctl,omarchy-swayosd-client,systemctl,flock	play-pause
+omarchy-spotify-media-key	Pause	Route pause to spotify_player when Spotify has playback focus; otherwise use the active media player.	NONE	XF86AudioPause	spotify_player,jq,playerctl,omarchy-swayosd-client,systemctl,flock	play-pause
+omarchy-spotify-media-key	Previous track	Route previous to spotify_player when Spotify has playback focus; otherwise use the active media player.	NONE	XF86AudioPrev	spotify_player,jq,playerctl,omarchy-swayosd-client,systemctl,flock	previous
+omarchy-spotify-tui	Spotify TUI process	Run spotify_player with the TUI-only config and shared cache.	NONE	NONE	spotify_player	-
+omarchy-spotify-debug-state	Spotify debug state	Write a read-only Spotify daemon, MPRIS, Hyprland, playback, and log snapshot under /tmp.	NONE	NONE	spotify_player,jq,rg,systemctl,playerctl,hyprctl	-
+omarchy-spotify-validate-controls	Spotify control validation	Validate daemon count, playback routing, play/pause, and Spotify volume sync.	NONE	NONE	spotify_player,jq,pgrep,timeout	-

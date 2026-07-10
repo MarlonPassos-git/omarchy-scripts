@@ -27,12 +27,48 @@ is_manifest_row() {
 }
 
 ensure_script_permissions() {
-  local script title description modifiers key dependencies
+  local script title description modifiers key dependencies args
 
-  while IFS=$'\t' read -r script title description modifiers key dependencies; do
+  while IFS=$'\t' read -r script title description modifiers key dependencies args; do
     is_manifest_row "$script" || continue
     chmod +x "$REPO_ROOT/src/$script"
   done <"$MANIFEST"
+}
+
+modifier_argument() {
+  case "$1" in
+    NONE | -) printf '' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+has_binding_key() {
+  [[ -n "${1:-}" && "$1" != "NONE" && "$1" != "-" ]]
+}
+
+binding_command() {
+  case "$1" in
+    XF86AudioRaiseVolume | XF86AudioLowerVolume) printf 'bindeld' ;;
+    XF86Audio*) printf 'bindld' ;;
+    *) printf 'bindd' ;;
+  esac
+}
+
+render_command_path() {
+  local script="$1"
+  local args="${2:-}"
+  local command_path
+
+  command_path=$(display_path "$REPO_ROOT/src/$script")
+  [[ -n "$args" && "$args" != "-" ]] && printf '%s %s\n' "$command_path" "$args" || printf '%s\n' "$command_path"
+}
+
+render_unbind_line() {
+  local modifiers="$1"
+  local key="$2"
+
+  has_binding_key "$key" || return 0
+  printf 'unbind = %s, %s\n' "$(modifier_argument "$modifiers")" "$key"
 }
 
 render_binding_line() {
@@ -40,21 +76,39 @@ render_binding_line() {
   local title="$2"
   local modifiers="$4"
   local key="$5"
-  local command_path
+  local args="${7:-}"
+  local bind_command command_path modifier_arg
 
-  command_path=$(display_path "$REPO_ROOT/src/$script")
-  printf 'bindd = %s, %s, %s, exec, %s\n' "$modifiers" "$key" "$title" "$command_path"
+  has_binding_key "$key" || return 0
+  bind_command=$(binding_command "$key")
+  command_path=$(render_command_path "$script" "$args")
+  modifier_arg=$(modifier_argument "$modifiers")
+  printf '%s = %s, %s, %s, exec, %s\n' "$bind_command" "$modifier_arg" "$key" "$title" "$command_path"
+}
+
+render_unbind_lines() {
+  local script title description modifiers key dependencies args
+
+  while IFS=$'\t' read -r script title description modifiers key dependencies args; do
+    is_manifest_row "$script" || continue
+    render_unbind_line "$modifiers" "$key"
+  done <"$MANIFEST"
+}
+
+render_binding_lines() {
+  local script title description modifiers key dependencies args
+
+  while IFS=$'\t' read -r script title description modifiers key dependencies args; do
+    is_manifest_row "$script" || continue
+    render_binding_line "$script" "$title" "$description" "$modifiers" "$key" "$dependencies" "$args"
+  done <"$MANIFEST"
 }
 
 render_bindings_block() {
-  local script title description modifiers key dependencies
-
   printf '%s\n' "$BEGIN_MARKER"
   printf '# Managed by ./scripts/install. Edit src/manifest.tsv, then rerun install.\n'
-  while IFS=$'\t' read -r script title description modifiers key dependencies; do
-    is_manifest_row "$script" || continue
-    render_binding_line "$script" "$title" "$description" "$modifiers" "$key" "$dependencies"
-  done <"$MANIFEST"
+  render_unbind_lines
+  render_binding_lines
   printf '%s\n' "$END_MARKER"
 }
 
@@ -67,6 +121,11 @@ strip_existing_bindings() {
     skip { next }
     /omarchy-capture-active-window/ { next }
     /omarchy-layout-main-two-stack/ { next }
+    /omarchy-spotify/ { next }
+    /spotify-media-key/ { next }
+    /omarchy-launch-or-focus-tui spotify-tui/ { next }
+    /Spotify TUI media-key routing/ { next }
+    /unbind = , XF86Audio/ { next }
     /# Arrange current workspace like a main pane with two side panes\./ { next }
     { print }
   ' "$file"

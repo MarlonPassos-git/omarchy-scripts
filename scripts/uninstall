@@ -17,6 +17,11 @@ strip_existing_bindings() {
     skip { next }
     /omarchy-capture-active-window/ { next }
     /omarchy-layout-main-two-stack/ { next }
+    /omarchy-spotify/ { next }
+    /spotify-media-key/ { next }
+    /omarchy-launch-or-focus-tui spotify-tui/ { next }
+    /Spotify TUI media-key routing/ { next }
+    /unbind = , XF86Audio/ { next }
     /# Arrange current workspace like a main pane with two side panes\./ { next }
     { print }
   ' "$file"

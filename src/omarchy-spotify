@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SPOTIFY_PLAYER=${SPOTIFY_PLAYER:-$HOME/.local/opt/spotify-player-0.24.0/usr/bin/spotify_player}
+SPOTIFY_TUI=${SPOTIFY_TUI:-$SCRIPT_DIR/omarchy-spotify-tui}
+SPOTIFY_TUI_LAUNCHER=${SPOTIFY_TUI_LAUNCHER:-omarchy-launch-or-focus-tui}
+SPOTIFY_CONFIG_FOLDER=${SPOTIFY_CONFIG_FOLDER:-$HOME/.config/spotify-player}
+SPOTIFY_CACHE_FOLDER=${SPOTIFY_CACHE_FOLDER:-$HOME/.cache/spotify-player}
+
+open_spotify_tui() {
+  if [[ -t 0 && -t 1 ]]; then
+    exec "$SPOTIFY_TUI"
+  fi
+
+  exec "$SPOTIFY_TUI_LAUNCHER" "$SPOTIFY_TUI"
+}
+
+extract_spotify_value() {
+  local spotify_target="$1"
+  spotify_target="${spotify_target#--uri=}"
+  spotify_target="${spotify_target%%\?*}"
+  spotify_target="${spotify_target%%#*}"
+  printf '%s\n' "$spotify_target"
+}
+
+spotify_resource_id() {
+  local spotify_target="$1"
+  spotify_target="${spotify_target%/}"
+  spotify_target="${spotify_target##*/}"
+  spotify_target="${spotify_target##*:}"
+  printf '%s\n' "$spotify_target"
+}
+
+spotify_resource_type() {
+  local spotify_target="$1"
+
+  if [[ "$spotify_target" == spotify:*:* ]]; then
+    spotify_target="${spotify_target#spotify:}"
+    printf '%s\n' "${spotify_target%%:*}"
+    return
+  fi
+
+  spotify_target="${spotify_target#https://open.spotify.com/}"
+  printf '%s\n' "${spotify_target%%/*}"
+}
+
+run_spotify_player() {
+  "$SPOTIFY_PLAYER" --config-folder "$SPOTIFY_CONFIG_FOLDER" --cache-folder "$SPOTIFY_CACHE_FOLDER" "$@"
+}
+
+start_spotify_target() {
+  local spotify_target resource_type resource_id
+  spotify_target="$(extract_spotify_value "$1")"
+  resource_type="$(spotify_resource_type "$spotify_target")"
+  resource_id="$(spotify_resource_id "$spotify_target")"
+
+  case "$resource_type" in
+    track) run_spotify_player playback start track --id "$resource_id" ;;
+    album | artist | playlist) run_spotify_player playback start context --id "$resource_id" "$resource_type" ;;
+    *) open_spotify_tui ;;
+  esac
+}
+
+main() {
+  if (($# == 0)); then
+    open_spotify_tui
+  fi
+
+  case "$1" in
+    --uri=* | spotify:* | https://open.spotify.com/*) start_spotify_target "$1" ;;
+    *) exec "$SPOTIFY_PLAYER" "$@" ;;
+  esac
+}
+
+main "$@"

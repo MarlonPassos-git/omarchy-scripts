@@ -1,0 +1,14 @@
+[Unit]
+Description=Spotify Player daemon
+After=graphical-session.target pipewire.service wireplumber.service
+
+[Service]
+Type=forking
+ExecStart=%h/.local/opt/spotify-player-0.24.0/usr/bin/spotify_player --daemon
+ExecStop=/usr/bin/pkill -TERM -f (^|/)spotify_player[[:space:]]--daemon$
+Restart=on-failure
+RestartSec=5s
+Environment=RUST_LOG=spotify_player=info
+
+[Install]
+WantedBy=default.target

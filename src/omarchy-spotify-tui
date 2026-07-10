@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SPOTIFY_PLAYER=${SPOTIFY_PLAYER:-$HOME/.local/opt/spotify-player-0.24.0/usr/bin/spotify_player}
+
+exec "$SPOTIFY_PLAYER" \
+  --config-folder "$HOME/.config/spotify-player-tui" \
+  --cache-folder "$HOME/.cache/spotify-player"
