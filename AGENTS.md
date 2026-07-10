@@ -39,6 +39,9 @@ This repository stores personal scripts used by Omarchy/Hyprland.
 
 - Every new script must appear in `README.md`.
 - The command table must list title, description, shortcut, script, and dependencies.
+- Record only user-facing script changes in `CHANGELOG.md`: behavior, install/uninstall, shortcuts, dependencies, and script-owned config. Exclude docs, tests, instructions, changelog maintenance, and internal refactors.
+- Group by `YYYY-MM-DD` as the release identifier; no commits or version numbers.
+- Merge same-day work into concise Added, Changed, and Removed sections.
 - Add code comments only for risks, decisions, and non-obvious side effects.
 
 ## Validation
