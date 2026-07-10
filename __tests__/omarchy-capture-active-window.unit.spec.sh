@@ -27,11 +27,11 @@ wait_for_log() {
   fail "expected log entry '$expected'"
 }
 
-write_fake_viewer() {
+write_fake_executable() {
   local filepath="$1"
-  local label="$2"
+  local source_code="$2"
 
-  printf '#!/bin/sh\nprintf "%s:%%s\\n" "$1" >> "$DEMO_TEST_LOG"\n' "$label" >"$filepath"
+  printf '%s\n' "$source_code" >"$filepath"
   chmod +x "$filepath"
 }
 
@@ -39,22 +39,40 @@ test_display_path_uses_home_symbol() {
   assert_equal "~/Pictures/screenshot.png" "$(display_path "$HOME/Pictures/screenshot.png")"
 }
 
-test_preview_prefers_imv() {
-  local tmpdir logfile viewer
+test_main_saves_copies_and_does_not_open_preview() {
+  local tmpdir clipboard_log notify_log viewer_log
   tmpdir=$(mktemp -d)
-  logfile="$tmpdir/viewer.log"
+  clipboard_log="$tmpdir/clipboard.log"
+  notify_log="$tmpdir/notify.log"
+  viewer_log="$tmpdir/viewer.log"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  write_fake_viewer "$tmpdir/imv" imv
-  write_fake_viewer "$tmpdir/xdg-open" xdg-open
+  mkdir -p "$tmpdir/home"
+  write_fake_executable "$tmpdir/hyprctl" '#!/bin/sh
+printf "%s\n" "{\"at\":[11,22],\"size\":[333,444]}"'
+  write_fake_executable "$tmpdir/grim" '#!/bin/sh
+printf "%s\n" "png-bytes" > "$3"'
+  write_fake_executable "$tmpdir/wl-copy" '#!/bin/sh
+cat > "$DEMO_CLIPBOARD_LOG"'
+  write_fake_executable "$tmpdir/notify-send" '#!/bin/sh
+printf "%s\n" "$*" > "$DEMO_NOTIFY_LOG"'
+  write_fake_executable "$tmpdir/imv" '#!/bin/sh
+printf "%s\n" "imv:$*" >> "$DEMO_VIEWER_LOG"'
+  write_fake_executable "$tmpdir/xdg-open" '#!/bin/sh
+printf "%s\n" "xdg-open:$*" >> "$DEMO_VIEWER_LOG"'
 
-  viewer=$(PATH="$tmpdir" screenshot_preview_command)
-  assert_equal "imv" "$viewer"
+  DEMO_CLIPBOARD_LOG="$clipboard_log" \
+    DEMO_NOTIFY_LOG="$notify_log" \
+    DEMO_VIEWER_LOG="$viewer_log" \
+    HOME="$tmpdir/home" \
+    PATH="$tmpdir:$PATH" \
+    main
 
-  DEMO_TEST_LOG="$logfile" PATH="$tmpdir" open_screenshot_preview /tmp/demo.png
-  wait_for_log "$logfile" "imv:/tmp/demo.png"
+  assert_equal "png-bytes" "$(cat "$clipboard_log")"
+  wait_for_log "$notify_log" "Active window screenshot saved"
+  [[ ! -f $viewer_log ]] || fail "expected preview viewer not to run"
 }
 
 test_display_path_uses_home_symbol
-test_preview_prefers_imv
+test_main_saves_copies_and_does_not_open_preview
 printf 'ok - omarchy-capture-active-window\n'
