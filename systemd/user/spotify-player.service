@@ -4,7 +4,8 @@ After=graphical-session.target pipewire.service wireplumber.service
 
 [Service]
 Type=forking
-ExecStart=%h/.local/opt/spotify-player-0.24.0/usr/bin/spotify_player --daemon
+ExecStartPre=/usr/bin/curl --silent --show-error --fail --head --connect-timeout 5 --max-time 10 --retry 12 --retry-delay 5 --retry-all-errors --retry-max-time 120 --output /dev/null https://accounts.spotify.com/
+ExecStart=%h/.local/opt/spotify-player-0.24.1/usr/bin/spotify_player --daemon
 ExecStop=/usr/bin/pkill -TERM -f (^|/)spotify_player[[:space:]]--daemon$
 Restart=on-failure
 RestartSec=5s

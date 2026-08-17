@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-SPOTIFY_PLAYER=${SPOTIFY_PLAYER:-$HOME/.local/opt/spotify-player-0.24.0/usr/bin/spotify_player}
+SPOTIFY_PLAYER=${SPOTIFY_PLAYER:-$HOME/.local/opt/spotify-player-0.24.1/usr/bin/spotify_player}
 SPOTIFY_TUI=${SPOTIFY_TUI:-$SCRIPT_DIR/omarchy-spotify-tui}
 SPOTIFY_TUI_LAUNCHER=${SPOTIFY_TUI_LAUNCHER:-omarchy-launch-or-focus-tui}
 SPOTIFY_CONFIG_FOLDER=${SPOTIFY_CONFIG_FOLDER:-$HOME/.config/spotify-player}
