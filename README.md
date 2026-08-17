@@ -27,7 +27,23 @@ This repository also stores the Spotify setup from
 [Omarchy + Spotify TUI](https://blog.marlonpassos.com.br/pt-br/omarchy-spotify-tui/).
 The setup keeps one `spotify_player --daemon` service as the real playback device
 and opens the interactive TUI with a separate config that never starts another
-streaming device.
+streaming device. Commands and the service require `spotify_player` 0.24.1 or
+newer because 0.24.0 can erase the cached OAuth refresh token.
+
+The generic Linux archive published for 0.24.1 does not include daemon support.
+Install both profiles required by this setup:
+
+```bash
+./scripts/install-spotify-player
+```
+
+Installer keeps full daemon-enabled binary at
+`~/.local/opt/spotify-player-0.24.1/usr/bin/spotify_player` and builds separate
+control-only TUI binary at
+`~/.local/opt/spotify-player-tui-0.24.1/usr/bin/spotify_player`. TUI profile is
+compiled without `streaming`, so it cannot register integrated Spotify Connect
+device. After both binaries pass version and feature checks, installer removes
+older versioned profiles and legacy project wrappers from `~/.local/bin`.
 
 Reference files:
 
@@ -41,6 +57,17 @@ systemctl --user enable --now spotify-player.service
 ./scripts/install
 ./src/omarchy-spotify-validate-controls
 ```
+
+The service waits for Spotify HTTPS connectivity before starting, so a login
+session that begins before the network is ready does not strand the daemon in an
+invisible OAuth flow. The installer also generates
+`~/.local/share/applications/spotify.desktop` with commands from the current
+clone, preventing legacy `~/.local/bin/spotify*` wrappers from launching an
+older `spotify_player`.
+
+Before opening TUI, launcher transfers playback to daemon device named
+`spotify-player`. Transfer failure does not block interface; it only leaves
+Spotify's current device unchanged.
 
 Media-key invocations write JSONL runtime logs with command duration, route, daemon
 health, and restart reason:
@@ -64,16 +91,16 @@ Recent daemon log errors only trigger a restart when a fresh playback probe also
 fails. If playback still responds, the key command keeps the current daemon and
 logs `recent-log-errors-playback-ok` instead of dropping the active item.
 
-If Spotify rejects the cached OAuth refresh token with `400 Bad Request`, move
-only the user token out of the active cache and authenticate again with the same
-binary used by the daemon:
+If 0.24.0 stored a null OAuth refresh token or Spotify rejects it with
+`400 Bad Request`, move only the user token out of the active cache and
+authenticate again with the same 0.24.1 binary used by the daemon:
 
 ```bash
 systemctl --user stop spotify-player.service
 backup_dir="$HOME/.cache/spotify-player/auth-backups/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$backup_dir"
 mv ~/.cache/spotify-player/user_client_token.json "$backup_dir/user_client_token.json.active-bad"
-~/.local/opt/spotify-player-0.24.0/usr/bin/spotify_player \
+~/.local/opt/spotify-player-0.24.1/usr/bin/spotify_player \
   --config-folder ~/.config/spotify-player \
   --cache-folder ~/.cache/spotify-player \
   authenticate
@@ -93,7 +120,7 @@ systemctl --user start spotify-player.service
 | Play/pause | - | Routes play/pause to `spotify_player` when Spotify has playback focus; otherwise uses the active media player. | `XF86AudioPlay` | [omarchy-spotify-media-key](src/omarchy-spotify-media-key) `play-pause` | [spotify_player](https://github.com/aome510/spotify-player), [jq](https://jqlang.org/), [playerctl](https://github.com/altdesktop/playerctl), `omarchy-swayosd-client`, `systemctl`, `flock` |
 | Pause | - | Routes pause to `spotify_player` when Spotify has playback focus; otherwise uses the active media player. | `XF86AudioPause` | [omarchy-spotify-media-key](src/omarchy-spotify-media-key) `play-pause` | [spotify_player](https://github.com/aome510/spotify-player), [jq](https://jqlang.org/), [playerctl](https://github.com/altdesktop/playerctl), `omarchy-swayosd-client`, `systemctl`, `flock` |
 | Previous track | - | Routes previous to `spotify_player` when Spotify has playback focus; otherwise uses the active media player. | `XF86AudioPrev` | [omarchy-spotify-media-key](src/omarchy-spotify-media-key) `previous` | [spotify_player](https://github.com/aome510/spotify-player), [jq](https://jqlang.org/), [playerctl](https://github.com/altdesktop/playerctl), `omarchy-swayosd-client`, `systemctl`, `flock` |
-| Spotify TUI process | - | Runs `spotify_player` with the TUI-only config and shared cache. | - | [omarchy-spotify-tui](src/omarchy-spotify-tui) | [spotify_player](https://github.com/aome510/spotify-player) |
+| Spotify TUI process | - | Connects daemon device and runs control-only `spotify_player` build with TUI config and shared cache. | - | [omarchy-spotify-tui](src/omarchy-spotify-tui) | [spotify_player](https://github.com/aome510/spotify-player) |
 | Spotify debug state | - | Writes a read-only Spotify daemon, MPRIS, Hyprland, playback, and log snapshot under `/tmp`. | - | [omarchy-spotify-debug-state](src/omarchy-spotify-debug-state) | [spotify_player](https://github.com/aome510/spotify-player), [jq](https://jqlang.org/), [ripgrep](https://github.com/BurntSushi/ripgrep), `systemctl`, [playerctl](https://github.com/altdesktop/playerctl), [hyprctl](https://wiki.hypr.land/Configuring/Using-hyprctl/) |
 | Spotify control validation | - | Validates daemon count, playback routing, play/pause, and Spotify volume sync. | - | [omarchy-spotify-validate-controls](src/omarchy-spotify-validate-controls) | [spotify_player](https://github.com/aome510/spotify-player), [jq](https://jqlang.org/), `pgrep`, `timeout` |
 
