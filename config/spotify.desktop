@@ -1,0 +1,30 @@
+[Desktop Entry]
+Type=Application
+Name=Spotify
+GenericName=Music Player
+Comment=Terminal Spotify player
+Icon=spotify-client
+TryExec=spotify_player
+Exec="@SPOTIFY_COMMAND@" %u
+Terminal=false
+MimeType=x-scheme-handler/spotify;
+Categories=Audio;Music;Player;AudioVideo;
+Keywords=spotify;music;player;tui;terminal;
+StartupWMClass=org.omarchy.omarchy-spotify-tui
+Actions=PlayPause;Next;Previous;OpenTui;
+
+[Desktop Action PlayPause]
+Name=Play/Pause
+Exec="@SPOTIFY_MEDIA_KEY@" play-pause
+
+[Desktop Action Next]
+Name=Next Track
+Exec="@SPOTIFY_MEDIA_KEY@" next
+
+[Desktop Action Previous]
+Name=Previous Track
+Exec="@SPOTIFY_MEDIA_KEY@" previous
+
+[Desktop Action OpenTui]
+Name=Open Player
+Exec="@SPOTIFY_COMMAND@"
