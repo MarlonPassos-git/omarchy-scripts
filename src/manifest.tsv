@@ -8,6 +8,6 @@ omarchy-spotify-media-key	Next track	Route next to spotify_player when Spotify h
 omarchy-spotify-media-key	Play/pause	Route play/pause to spotify_player when Spotify has playback focus; otherwise use the active media player.	NONE	XF86AudioPlay	spotify_player,jq,playerctl,omarchy-swayosd-client,systemctl,flock	play-pause
 omarchy-spotify-media-key	Pause	Route pause to spotify_player when Spotify has playback focus; otherwise use the active media player.	NONE	XF86AudioPause	spotify_player,jq,playerctl,omarchy-swayosd-client,systemctl,flock	play-pause
 omarchy-spotify-media-key	Previous track	Route previous to spotify_player when Spotify has playback focus; otherwise use the active media player.	NONE	XF86AudioPrev	spotify_player,jq,playerctl,omarchy-swayosd-client,systemctl,flock	previous
-omarchy-spotify-tui	Spotify TUI process	Run spotify_player with the TUI-only config and shared cache.	NONE	NONE	spotify_player	-
+omarchy-spotify-tui	Spotify TUI process	Connect the daemon device and run the control-only spotify_player build with the TUI config and shared cache.	NONE	NONE	spotify_player	-
 omarchy-spotify-debug-state	Spotify debug state	Write a read-only Spotify daemon, MPRIS, Hyprland, playback, and log snapshot under /tmp.	NONE	NONE	spotify_player,jq,rg,systemctl,playerctl,hyprctl	-
 omarchy-spotify-validate-controls	Spotify control validation	Validate daemon count, playback routing, play/pause, and Spotify volume sync.	NONE	NONE	spotify_player,jq,pgrep,timeout	-

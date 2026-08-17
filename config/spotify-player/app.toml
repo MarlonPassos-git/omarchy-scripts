@@ -33,7 +33,6 @@ enable_streaming = "Always"
 enable_audio_visualization = false
 enable_notify = true
 enable_cover_image_cache = true
-default_device = "spotify-player"
 notify_streaming_only = false
 seek_duration_secs = 5
 sort_artist_albums_by_type = false

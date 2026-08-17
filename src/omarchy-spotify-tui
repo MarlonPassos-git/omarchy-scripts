@@ -1,8 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SPOTIFY_PLAYER=${SPOTIFY_PLAYER:-$HOME/.local/opt/spotify-player-0.24.0/usr/bin/spotify_player}
+SPOTIFY_CONTROL_PLAYER=${SPOTIFY_CONTROL_PLAYER:-$HOME/.local/opt/spotify-player-0.24.1/usr/bin/spotify_player}
+SPOTIFY_TUI_PLAYER=${SPOTIFY_TUI_PLAYER:-$HOME/.local/opt/spotify-player-tui-0.24.1/usr/bin/spotify_player}
+SPOTIFY_CONFIG_FOLDER=${SPOTIFY_CONFIG_FOLDER:-$HOME/.config/spotify-player}
+SPOTIFY_TUI_CONFIG_FOLDER=${SPOTIFY_TUI_CONFIG_FOLDER:-$HOME/.config/spotify-player-tui}
+SPOTIFY_CACHE_FOLDER=${SPOTIFY_CACHE_FOLDER:-$HOME/.cache/spotify-player}
 
-exec "$SPOTIFY_PLAYER" \
-  --config-folder "$HOME/.config/spotify-player-tui" \
-  --cache-folder "$HOME/.cache/spotify-player"
+connect_daemon_device() {
+  "$SPOTIFY_CONTROL_PLAYER" \
+    --config-folder "$SPOTIFY_CONFIG_FOLDER" \
+    --cache-folder "$SPOTIFY_CACHE_FOLDER" \
+    connect --name spotify-player >/dev/null 2>&1 || true
+}
+
+main() {
+  connect_daemon_device
+
+  exec "$SPOTIFY_TUI_PLAYER" \
+    --config-folder "$SPOTIFY_TUI_CONFIG_FOLDER" \
+    --cache-folder "$SPOTIFY_CACHE_FOLDER"
+}
+
+main "$@"
