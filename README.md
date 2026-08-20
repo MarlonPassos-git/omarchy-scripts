@@ -1,6 +1,6 @@
 # Omarchy Scripts
 
-Personal scripts for [Omarchy](https://omarchy.org/) and [Hyprland](https://hypr.land/). Commands live in `src/`, keybindings live in `src/manifest.tsv`, and installation generates the managed keybinding block in `~/.config/hypr/bindings.conf`.
+Personal scripts for [Omarchy](https://omarchy.org/) and [Hyprland](https://hypr.land/). Commands live in `src/`, keybindings live in `src/manifest.tsv`, and installation generates the managed Quattro keybinding block in `~/.config/hypr/bindings.lua`.
 
 ## Installation
 
@@ -11,6 +11,11 @@ git clone git@github.com:MarlonPassos-git/omarchy-scripts.git ~/projects/omarchy
 cd ~/projects/omarchy-scripts
 ./scripts/install
 ```
+
+Installer currently activates active-window screenshot, main/side-stack layout,
+and Spotify TUI bindings. Spotify media-key rows remain deferred while their
+legacy `playerctl` and SwayOSD fallbacks are migrated to Omarchy Shell; Quattro's
+default media bindings remain active in the meantime.
 
 ## Uninstall
 

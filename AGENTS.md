@@ -22,8 +22,9 @@ This repository stores personal scripts used by Omarchy/Hyprland.
 ## Hyprland
 
 - Do not edit files in `~/.local/share/omarchy`.
-- Use `~/.config/hypr/bindings.conf` for personal keybindings.
-- Manage project keybindings inside the `# BEGIN omarchy-scripts` / `# END omarchy-scripts` block.
+- Use `~/.config/hypr/bindings.lua` for personal keybindings.
+- Manage project keybindings inside the `-- BEGIN omarchy-scripts` / `-- END omarchy-scripts` block.
+- Generate bindings with Quattro's `hl.unbind(...)` and `o.bind(...)` APIs.
 - After changing keybindings, run `hyprctl reload` and `hyprctl configerrors`.
 
 ## Shell

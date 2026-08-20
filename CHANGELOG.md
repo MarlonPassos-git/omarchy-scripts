@@ -3,6 +3,15 @@
 User-facing script changes are grouped by day. Each date is the release
 identifier; commits and internal maintenance are intentionally omitted.
 
+## 2026-08-20
+
+### Changed
+
+- Installer now manages screenshot, layout, and Spotify TUI bindings through
+  Hyprland Lua on Omarchy Quattro.
+- Spotify media-key overrides stay deferred so Quattro's working defaults remain
+  active until shell media and OSD fallbacks are ported.
+
 ## 2026-08-17
 
 ### Added
