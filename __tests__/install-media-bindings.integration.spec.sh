@@ -10,14 +10,24 @@ assert_file_contains() {
   local file="$1"
   local expected="$2"
 
-  grep -Fq "$expected" "$file" || fail "expected <$expected> in $file"
+  grep -Fq -- "$expected" "$file" || fail "expected <$expected> in $file"
 }
 
 assert_file_not_contains() {
   local file="$1"
   local unexpected="$2"
 
-  ! grep -Fq "$unexpected" "$file" || fail "unexpected <$unexpected> in $file"
+  ! grep -Fq -- "$unexpected" "$file" || fail "unexpected <$unexpected> in $file"
+}
+
+assert_line_count() {
+  local file="$1"
+  local pattern="$2"
+  local expected="$3"
+  local actual
+
+  actual="$(grep -Fc -- "$pattern" "$file" || true)"
+  [[ "$actual" == "$expected" ]] || fail "expected $expected lines matching <$pattern>, got $actual"
 }
 
 write_fake_executable() {
@@ -36,33 +46,45 @@ repo_command_path() {
   printf '~/%s/src/%s\n' "$repo_path" "$script"
 }
 
-test_install_generates_media_bindings_and_master_layout_config() {
-  local tmpdir bindings_file media_key spotify_command
+test_install_generates_quattro_bindings_without_media_overrides() {
+  local tmpdir bindings_file capture_command layout_command spotify_command
   tmpdir=$(mktemp -d)
-  bindings_file="$tmpdir/bindings.conf"
+  bindings_file="$tmpdir/bindings.lua"
   trap 'rm -rf "$tmpdir"' RETURN
 
   write_fake_executable "$tmpdir/hyprctl" '#!/usr/bin/env sh
 [ "$1" = "configerrors" ] && exit 0
 exit 0'
-  printf '%s\n' \
-    'bindd = SUPER SHIFT, M, Music TUI, exec, omarchy-launch-or-focus-tui spotify-tui' \
-    '# Spotify TUI media-key routing. Falls back to Omarchy defaults.' \
-    'bindld = , XF86AudioNext, Next track, exec, spotify-media-key next' \
-    >"$bindings_file"
+  printf '%s\n' 'o.bind("SUPER + R", "Personal command", "personal-command")' >"$bindings_file"
 
-  PATH="$tmpdir:$PATH" HYPR_BINDINGS_FILE="$bindings_file" ./scripts/install >/dev/null
-  media_key="$(repo_command_path omarchy-spotify-media-key)"
+  PATH="$tmpdir:$PATH" \
+    HYPR_BINDINGS_LUA_FILE="$bindings_file" \
+    SPOTIFY_DESKTOP_FILE="$tmpdir/spotify.desktop" \
+    ./scripts/install >/dev/null
+  capture_command="$(repo_command_path omarchy-capture-active-window)"
+  layout_command="$(repo_command_path omarchy-layout-main-two-stack)"
   spotify_command="$(repo_command_path omarchy-spotify)"
 
-  assert_file_contains "$bindings_file" 'unbind = , XF86AudioNext'
-  assert_file_contains "$bindings_file" "bindld = , XF86AudioNext, Next track, exec, $media_key next"
-  assert_file_contains "$bindings_file" "bindeld = , XF86AudioRaiseVolume, Volume up, exec, $media_key volume-up"
-  assert_file_contains "$bindings_file" "bindd = SUPER SHIFT, M, Spotify TUI, exec, $spotify_command"
-  assert_file_contains "$bindings_file" 'new_status = slave'
-  assert_file_not_contains "$bindings_file" 'exec, spotify-media-key'
-  assert_file_not_contains "$bindings_file" 'omarchy-launch-or-focus-tui spotify-tui'
+  assert_file_contains "$bindings_file" 'o.bind("SUPER + R", "Personal command", "personal-command")'
+  assert_file_contains "$bindings_file" 'hl.unbind("SUPER + SHIFT + PRINT")'
+  assert_file_contains "$bindings_file" "o.bind(\"SUPER + SHIFT + PRINT\", \"Active window screenshot\", \"$capture_command\")"
+  assert_file_contains "$bindings_file" "o.bind(\"SUPER + ALT + L\", \"Main + side stack layout\", \"$layout_command\")"
+  assert_file_contains "$bindings_file" "o.bind(\"SUPER + SHIFT + M\", \"Spotify TUI\", \"$spotify_command\")"
+  assert_file_contains "$bindings_file" 'new_status = "slave"'
+  assert_file_not_contains "$bindings_file" 'omarchy-spotify-media-key'
+  assert_file_not_contains "$bindings_file" 'XF86Audio'
+
+  PATH="$tmpdir:$PATH" \
+    HYPR_BINDINGS_LUA_FILE="$bindings_file" \
+    SPOTIFY_DESKTOP_FILE="$tmpdir/spotify.desktop" \
+    ./scripts/install >/dev/null
+  assert_line_count "$bindings_file" '-- BEGIN omarchy-scripts' 1
+
+  PATH="$tmpdir:$PATH" HYPR_BINDINGS_LUA_FILE="$bindings_file" ./scripts/uninstall >/dev/null
+  assert_file_contains "$bindings_file" 'o.bind("SUPER + R", "Personal command", "personal-command")'
+  assert_file_not_contains "$bindings_file" 'omarchy-capture-active-window'
+  assert_file_not_contains "$bindings_file" '-- BEGIN omarchy-scripts'
 }
 
-test_install_generates_media_bindings_and_master_layout_config
-printf 'ok - install media bindings and master layout config\n'
+test_install_generates_quattro_bindings_without_media_overrides
+printf 'ok - install Quattro bindings without media overrides\n'

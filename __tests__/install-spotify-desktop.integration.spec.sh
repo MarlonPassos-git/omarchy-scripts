@@ -25,9 +25,9 @@ test_install_replaces_legacy_spotify_desktop_commands() {
   tmpdir=$(mktemp -d)
   trap 'rm -rf "$tmpdir"' RETURN
 
-  printf '%s\n' '# existing binding' >"$tmpdir/bindings.conf"
+  printf '%s\n' '-- existing binding' >"$tmpdir/bindings.lua"
   printf '%s\n' 'Exec=spotify %u' 'Exec=spotify-media-key play-pause' >"$tmpdir/spotify.desktop"
-  HYPR_BINDINGS_FILE="$tmpdir/bindings.conf" \
+  HYPR_BINDINGS_LUA_FILE="$tmpdir/bindings.lua" \
     SPOTIFY_DESKTOP_FILE="$tmpdir/spotify.desktop" \
     PATH="/usr/bin:/bin" \
     ./scripts/install >/dev/null
