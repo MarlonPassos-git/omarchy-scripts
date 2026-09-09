@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""Deliver Codex's agent-turn-complete JSON argument to the desktop notifier."""
+
+import html
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+
+def command_output(*args):
+    return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL, timeout=3).strip()
+
+
+def parent_pids(pid):
+    seen = set()
+    while pid > 1 and pid not in seen:
+        seen.add(pid)
+        yield pid
+        try:
+            # comm may contain spaces and parentheses; ppid follows the final ')'.
+            fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+            pid = int(fields[1])
+        except (OSError, ValueError, IndexError):
+            return
+
+
+def window_for_process(clients, pid):
+    for parent in parent_pids(pid):
+        matches = [c for c in clients if c.get("pid") == parent]
+        if len(matches) == 1:
+            window = matches[0]
+            return {key: window[key] for key in ("address", "pid", "stableId")}
+        if matches:
+            # Several windows in one terminal process cannot be distinguished by PID.
+            return None
+    return None
+
+
+def tmux_pane(socket, pane):
+    fields = command_output("tmux", "-S", socket, "display-message", "-p", "-t", pane,
+                            "#{pane_pid}\t#{session_id}\t#{window_id}").split("\t")
+    return {"pid": int(fields[0]), "session": fields[1], "window": fields[2]}
+
+
+def tmux_clients(socket):
+    output = command_output("tmux", "-S", socket, "list-clients", "-F",
+                            "#{client_pid}\t#{client_name}\t#{session_id}\t#{client_activity}")
+    return [line.split("\t") for line in output.splitlines()]
+
+
+def notification_target():
+    try:
+        clients = json.loads(command_output("hyprctl", "clients", "-j"))
+        if os.environ.get("TMUX") and os.environ.get("TMUX_PANE"):
+            socket = os.environ["TMUX"].rsplit(",", 2)[0]
+            pane = os.environ["TMUX_PANE"]
+            info = tmux_pane(socket, pane)
+            attached = sorted(tmux_clients(socket), key=lambda row: int(row[3]), reverse=True)
+            for pid, name, session, _ in attached:
+                if session != info["session"]:
+                    continue
+                window = window_for_process(clients, int(pid))
+                if window:
+                    return {"window": window, "tmux": {"socket": socket, "pane": pane,
+                            "pane_pid": info["pid"], "client": name, "client_pid": int(pid)}}
+            return None
+        window = window_for_process(clients, os.getpid())
+        return {"window": window} if window else None
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError):
+        # Notifications still arrive when no unambiguous local window is available.
+        return None
+
+
+def focus_notification(target):
+    if not target:
+        return 0
+    try:
+        window = target["window"]
+        clients = json.loads(command_output("hyprctl", "clients", "-j"))
+        if not any(all(c.get(k) == v for k, v in window.items()) for c in clients):
+            return 0
+        address = window["address"]
+        if not re.fullmatch(r"0x[0-9a-fA-F]+", address):
+            return 0
+        if target.get("tmux"):
+            tmux = target["tmux"]
+            socket = tmux["socket"]
+            pane = tmux_pane(socket, tmux["pane"])
+            attached = tmux_clients(socket)
+            if pane["pid"] != tmux["pane_pid"] or not any(
+                int(row[0]) == tmux["client_pid"] and row[1] == tmux["client"] for row in attached
+            ):
+                return 0
+            command_output("tmux", "-S", socket, "switch-client", "-c", tmux["client"], "-t", pane["session"])
+            command_output("tmux", "-S", socket, "select-window", "-t", pane["session"] + ":" + pane["window"])
+            command_output("tmux", "-S", socket, "select-pane", "-t", tmux["pane"])
+        command_output("hyprctl", "dispatch", f'hl.dsp.focus({{ window = "address:{address}" }})')
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError):
+        return 0
+    return 0
+
+
+def compact(text, limit):
+    text = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", text)
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def is_title_generation(payload):
+    # Codex CLI 0.153.4 also calls notify for its internal title-generation turn,
+    # with the same event/client as a user turn. Match both its prompt and output.
+    messages = payload.get("input-messages")
+    if not isinstance(messages, list) or len(messages) != 1 or not isinstance(messages[0], str):
+        return False
+    if not messages[0].startswith("Generate a concise, single-line task title of at most 36 characters "):
+        return False
+    try:
+        response = json.loads(payload.get("last-assistant-message") or "")
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return isinstance(response, dict) and set(response) == {"title"} and isinstance(response["title"], str)
+
+
+def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "--focus":
+        return focus_notification(json.loads(sys.argv[2]))
+    if len(sys.argv) != 2:
+        print("payload: expected one JSON object argument", file=sys.stderr)
+        return 2
+    try:
+        payload = json.loads(sys.argv[1])
+    except json.JSONDecodeError:
+        print("payload: invalid JSON; expected an object (content omitted)", file=sys.stderr)
+        return 2
+    if not isinstance(payload, dict):
+        print("payload: expected a JSON object (content omitted)", file=sys.stderr)
+        return 2
+    if payload.get("type") != "agent-turn-complete":
+        return 0
+    if is_title_generation(payload):
+        return 0
+
+    for field in ("cwd", "last-assistant-message"):
+        if payload.get(field) is not None and not isinstance(payload[field], str):
+            print(f"{field}: invalid value; expected a string (content omitted)", file=sys.stderr)
+            return 2
+
+    project = compact(Path(payload.get("cwd") or "").name, 70)
+    title = "Codex terminou" + (f" · {project}" if project else "")
+    body = compact(payload.get("last-assistant-message") or "", 240)
+    body = body or "Resposta pronta. Volte ao terminal quando quiser."
+    # Keep dash-leading model output from being parsed as an Omarchy CLI option.
+    if body.startswith("-"):
+        body = "\u200b" + body
+    # A file-backed icon also survives Omarchy notification-history persistence.
+    icon = Path("/usr/share/icons/hicolor/256x256/apps/codex-desktop.png")
+    # Notification bodies support markup: model output must remain literal text.
+    subprocess.run(
+        ["omarchy", "notification", "send", "--app-name=Codex",
+         f"--icon={icon if icon.is_file() else 'codex-desktop'}",
+         "--urgency=normal", title, html.escape(body, quote=False),
+         "--exec", sys.executable, str(Path(__file__).resolve()), "--focus",
+         json.dumps(notification_target())],
+        check=True,
+        timeout=10,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
