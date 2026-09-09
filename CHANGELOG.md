@@ -3,6 +3,19 @@
 User-facing script changes are grouped by day. Each date is the release
 identifier; commits and internal maintenance are intentionally omitted.
 
+## 2026-09-09
+
+### Added
+
+- Added Codex completion notifications with the project name, a short response
+  preview, and the Codex desktop icon through Omarchy's notification service.
+- Added an opt-in installer that backs up Codex configuration and keeps approval
+  alerts in the terminal without duplicate completion alerts.
+- Suppressed Codex's internal title-generation notifications and preserved the
+  installed Codex icon in Omarchy notification history using the native sender.
+- Clicking a new Codex notification focuses its originating terminal and restores
+  the tmux pane when applicable, without changing focus on delivery.
+
 ## 2026-08-20
 
 ### Changed

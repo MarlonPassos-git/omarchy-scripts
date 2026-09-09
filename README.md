@@ -26,6 +26,51 @@ cd ~/projects/omarchy-scripts
 ./scripts/uninstall
 ```
 
+## Codex notifications
+
+Connect Codex CLI completion events to Omarchy's desktop notifications:
+
+```bash
+./scripts/install-codex-notifications
+```
+
+Requires Python 3.11+ and `omarchy notification send`. Restart existing Codex CLI sessions
+after installation. The installer points `notify` in `~/.codex/config.toml`
+(or `$CODEX_HOME/config.toml`) directly to this clone, preserves unrelated
+settings, and creates a timestamped backup before changes. It refuses to replace
+another `notify` integration. Rerun it after moving the clone, first removing the
+old `notify` setting if it points to the previous location.
+
+Notifications use the desktop theme, the project directory name, and at most
+240 characters of the final response. Response text is escaped for notification
+markup. The icon uses `codex-desktop` when installed. Delivery does not change focus.
+The preview also appears in the desktop notification history.
+Clicking a new notification focuses the window that originated it, identified
+through its process ancestry rather than its title or project directory. In tmux,
+the click also restores the originating session, window, and pane in an attached
+terminal. This requires `hyprctl` and, when applicable, `tmux`.
+If the window has closed, the tmux client has detached, or several windows share
+one terminal PID, the click does nothing rather than selecting an unrelated window.
+Old notifications created without a click target cannot acquire one retroactively.
+The internal title-generation event observed in Codex CLI 0.153.4 is filtered
+by its prompt and response shape so it does not produce a second JSON toast.
+This compatibility filter may need updating if Codex changes that internal prompt.
+
+Only completion events are supported by Codex's `notify` integration. The
+installer keeps `approval-requested` terminal notifications enabled and removes
+completion events from that channel to prevent duplicate Alacritty bell alerts.
+It does not configure Alacritty's bell or Hyprland focus rules.
+
+To disconnect, remove the top-level `notify` setting and restore your previous
+`[tui].notifications` value from the backup, then restart Codex. The general
+uninstaller only removes managed keybindings; this opt-in configuration remains.
+
+Validate without sending desktop notifications:
+
+```bash
+python3 __tests__/omarchy-codex-notify.integration.spec.py
+```
+
 ## Spotify Player TUI
 
 This repository also stores the Spotify setup from
@@ -116,6 +161,7 @@ systemctl --user start spotify-player.service
 
 | Title | Example | Description | Shortcut | Script | Dependencies |
 | --- | --- | --- | --- | --- | --- |
+| Codex notifications | - | Shows completion with the project and response preview; clicking returns to the originating terminal or tmux pane. | - | [omarchy-codex-notify](src/omarchy-codex-notify) | Python 3.11+, `omarchy`, `hyprctl`; `tmux` when used |
 | Active window screenshot | <img src=".github/assets/omarchy-capture-active-window.gif" alt="Active window screenshot demo" width="420"> | Captures the active window, saves it to Pictures, copies it to the clipboard, and shows a notification with the saved path. | `Super + Shift + Print` | [omarchy-capture-active-window](src/omarchy-capture-active-window) | [hyprctl](https://wiki.hypr.land/Configuring/Using-hyprctl/), [jq](https://jqlang.org/), [grim](https://man.archlinux.org/man/grim.1.en), [wl-copy](https://man.archlinux.org/man/wl-copy.1.en), [notify-send](https://man.archlinux.org/man/notify-send.1.en) |
 | Main + side stack layout | <img src=".github/assets/omarchy-layout-main-two-stack.gif" alt="Main + side stack layout demo" width="420"> | Toggles the current workspace between `dwindle` and `master`, using the focused window as the main pane and stacking the other windows on the right. | `Super + Alt + L` | [omarchy-layout-main-two-stack](src/omarchy-layout-main-two-stack) | [hyprctl](https://wiki.hypr.land/Configuring/Using-hyprctl/), [jq](https://jqlang.org/), [notify-send](https://man.archlinux.org/man/notify-send.1.en) |
 | Spotify TUI | - | Opens or focuses the `spotify_player` TUI while playback stays on the daemon device. | `Super + Shift + M` | [omarchy-spotify](src/omarchy-spotify) | [spotify_player](https://github.com/aome510/spotify-player), `omarchy-launch-or-focus-tui` |
