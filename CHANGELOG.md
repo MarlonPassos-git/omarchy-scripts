@@ -38,6 +38,13 @@ identifier; commits and internal maintenance are intentionally omitted.
 - Clicking a new Codex notification focuses its originating terminal and restores
   the tmux pane when applicable, without changing focus on delivery.
 
+## 2026-09-02
+
+### Added
+
+- Added scheduled push for existing commits from an explicit local repository
+  allowlist, with exact remote validation and protected work branches.
+
 ## 2026-08-20
 
 ### Changed

@@ -102,6 +102,34 @@ npm test
 npm run typecheck
 ```
 
+## Scheduled Git pushes
+
+`omarchy-git-auto-push` pushes existing commits only. It does not stage files,
+create commits, pull, rebase, push tags, or force-push.
+
+The machine-local allowlist lives at
+`~/.config/git-auto-push/repositories.conf`. Each entry pins policy, worktree,
+and expected remote destination:
+
+```text
+personal|~/projects/example|github.com/example/example
+work|~/Work/example|bitbucket.org/example/example
+```
+
+Paths in the real configuration must be absolute. `personal` accepts
+`main`/`master`; `work` blocks them and requires the current branch to track a
+same-named branch on `origin`. Every policy rejects detached HEAD, divergent
+branches, missing upstreams, and changed remote destinations.
+
+Validate and enable four daily runs:
+
+```bash
+./src/omarchy-git-auto-push.sh --dry-run
+systemctl --user link "$PWD/systemd/user/omarchy-git-auto-push.service"
+systemctl --user link "$PWD/systemd/user/omarchy-git-auto-push.timer"
+systemctl --user enable --now omarchy-git-auto-push.timer
+```
+
 ## Commands
 
 | Title | Example | Description | Shortcut | Script | Dependencies |
@@ -110,6 +138,7 @@ npm run typecheck
 | Active window screenshot | <img src=".github/assets/omarchy-capture-active-window.gif" alt="Active window screenshot demo" width="420"> | Captures the active Hyprland window, saves it to Pictures, copies it to the clipboard, and shows a notification with the saved path. | `Super + Shift + Print` | [omarchy-capture-active-window.sh](src/omarchy-capture-active-window.sh) | [hyprctl](https://wiki.hypr.land/Configuring/Using-hyprctl/), [jq](https://jqlang.org/), [grim](https://man.archlinux.org/man/grim.1.en), [wl-copy](https://man.archlinux.org/man/wl-copy.1.en), [notify-send](https://man.archlinux.org/man/notify-send.1.en) |
 | Main + side stack layout | <img src=".github/assets/omarchy-layout-main-two-stack.gif" alt="Main + side stack layout demo" width="420"> | Toggles the current workspace between `dwindle` and `master`, using the focused window as the main pane and stacking the other windows on the right. | `Super + Alt + L` | [omarchy-layout-main-two-stack.sh](src/omarchy-layout-main-two-stack.sh) | [hyprctl](https://wiki.hypr.land/Configuring/Using-hyprctl/), [jq](https://jqlang.org/), [notify-send](https://man.archlinux.org/man/notify-send.1.en) |
 | Alacritty terminal hint | - | Opens terminal file hints in Neovim and delegates directories and links to the desktop. | `Ctrl + Shift + O` | [omarchy-open-terminal-hint.ts](src/omarchy-open-terminal-hint.ts) | Node.js 24+, Alacritty, Neovim, `xdg-open`, `notify-send` |
+| Scheduled Git push | `./src/omarchy-git-auto-push.sh --dry-run` | Pushes existing commits from an explicit machine-local allowlist. Work repositories protect `main` and `master` and require a same-named branch on `origin`. | - | [omarchy-git-auto-push.sh](src/omarchy-git-auto-push.sh) | [git](https://git-scm.com/), `flock` |
 
 ## License
 
