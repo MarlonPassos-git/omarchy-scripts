@@ -1,0 +1,11 @@
+[Unit]
+Description=Push committed changes from explicitly allowed Git repositories
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=GIT_TERMINAL_PROMPT=0
+Environment="GIT_SSH_COMMAND=/usr/bin/ssh -o BatchMode=yes"
+ExecStart=/usr/bin/flock --nonblock %t/omarchy-git-auto-push.lock %h/projects/omarchy-scripts/src/omarchy-git-auto-push.sh
+TimeoutStartSec=15min
