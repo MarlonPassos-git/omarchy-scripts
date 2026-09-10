@@ -5,6 +5,7 @@ BEGIN_MARKER="-- BEGIN omarchy-scripts"
 END_MARKER="-- END omarchy-scripts"
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 MANIFEST="$REPO_ROOT/src/manifest.tsv"
+ALACRITTY_IMPORT="~/.config/alacritty/omarchy-scripts.toml"
 
 hypr_bindings_lua_file() {
   printf '%s\n' "${HYPR_BINDINGS_LUA_FILE:-$HOME/.config/hypr/bindings.lua}"
@@ -115,6 +116,8 @@ render_bindings_block() {
   printf '%s\n' '-- Managed by ./scripts/install. Edit src/manifest.tsv, then rerun install.'
   printf '%s\n' '-- Keep new windows in the side stack; Omarchy promotes them to master by default.'
   printf '%s\n' 'hl.config({' '  master = {' '    new_status = "slave",' '  },' '})'
+  printf '%s\n' '-- Prevent Alacritty activation requests from stealing focus.'
+  printf '%s\n' 'o.window("^Alacritty$", {' '  focus_on_activate = false,' '})'
   printf '%s\n' '-- Unbind defaults first so managed shortcuts can override Quattro safely.'
   render_unbind_lines
   render_binding_lines
@@ -166,11 +169,74 @@ reload_hyprland() {
   hyprctl configerrors
 }
 
+alacritty_config_file() {
+  printf '%s\n' "${ALACRITTY_CONFIG_FILE:-$HOME/.config/alacritty/alacritty.toml}"
+}
+
+alacritty_fragment_file() {
+  printf '%s\n' "${ALACRITTY_FRAGMENT_FILE:-$HOME/.config/alacritty/omarchy-scripts.toml}"
+}
+
+hint_command_file() {
+  printf '%s\n' "${OPEN_TERMINAL_HINT_FILE:-$HOME/.local/bin/omarchy-open-terminal-hint}"
+}
+
+backup_file() {
+  local file="$1"
+
+  cp -a "$file" "$file.bak.omarchy-scripts-$(date +'%Y%m%d%H%M%S')"
+}
+
+install_symlink() {
+  local source="$1"
+  local target="$2"
+
+  mkdir -p "$(dirname "$target")"
+  if [[ -L "$target" && "$(readlink -f "$target")" == "$(readlink -f "$source")" ]]; then
+    return
+  fi
+  if [[ -e "$target" || -L "$target" ]]; then
+    mv "$target" "$target.bak.omarchy-scripts-$(date +'%Y%m%d%H%M%S')"
+  fi
+  ln -s "$source" "$target"
+}
+
+ensure_alacritty_import() {
+  local file tmp
+  file=$(alacritty_config_file)
+  [[ -f "$file" ]] || { printf 'Alacritty config missing: %s\n' "$file" >&2; return 1; }
+  grep -Fq -- "\"$ALACRITTY_IMPORT\"" "$file" && return
+  grep -Eq '^general\.import = \[[^]]*\][[:space:]]*$' "$file" || {
+    printf 'Alacritty general.import has an unsupported format in %s; expected a one-line array.\n' "$file" >&2
+    return 1
+  }
+  backup_file "$file"
+  tmp=$(mktemp)
+  awk -v import="$ALACRITTY_IMPORT" '
+    !updated && /^general\.import = \[[^]]*\][[:space:]]*$/ {
+      sub(/\][[:space:]]*$/, ", \"" import "\" ]")
+      updated = 1
+    }
+    { print }
+  ' "$file" >"$tmp"
+  install -m 0644 "$tmp" "$file"
+  rm -f "$tmp"
+}
+
+install_alacritty_config() {
+  install_symlink "$REPO_ROOT/config/alacritty/omarchy-scripts.toml" "$(alacritty_fragment_file)"
+  install_symlink "$REPO_ROOT/src/omarchy-open-terminal-hint" "$(hint_command_file)"
+  ensure_alacritty_import
+  # Replacing an imported symlink does not always trigger Alacritty's file watcher.
+  touch "$(alacritty_config_file)"
+}
+
 main() {
   ensure_script_permissions
   install_bindings
+  install_alacritty_config
   reload_hyprland
-  printf 'Installed omarchy-scripts keybindings.\n'
+  printf 'Installed omarchy-scripts keybindings and personal configurations.\n'
 }
 
 main "$@"

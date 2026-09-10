@@ -3,6 +3,7 @@ set -euo pipefail
 
 BEGIN_MARKER="-- BEGIN omarchy-scripts"
 END_MARKER="-- END omarchy-scripts"
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 hypr_bindings_lua_file() {
   printf '%s\n' "${HYPR_BINDINGS_LUA_FILE:-$HOME/.config/hypr/bindings.lua}"
@@ -52,10 +53,36 @@ reload_hyprland() {
   hyprctl configerrors
 }
 
+alacritty_fragment_file() {
+  printf '%s\n' "${ALACRITTY_FRAGMENT_FILE:-$HOME/.config/alacritty/omarchy-scripts.toml}"
+}
+
+hint_command_file() {
+  printf '%s\n' "${OPEN_TERMINAL_HINT_FILE:-$HOME/.local/bin/omarchy-open-terminal-hint}"
+}
+
+remove_managed_symlink() {
+  local source="$1"
+  local target="$2"
+
+  [[ -L "$target" ]] || return
+  if [[ "$(readlink -f "$target")" != "$(readlink -f "$source")" ]]; then
+    printf 'Preserved unrelated symlink: %s\n' "$target" >&2
+    return
+  fi
+  unlink "$target"
+}
+
+uninstall_alacritty_config() {
+  remove_managed_symlink "$REPO_ROOT/config/alacritty/omarchy-scripts.toml" "$(alacritty_fragment_file)"
+  remove_managed_symlink "$REPO_ROOT/src/omarchy-open-terminal-hint" "$(hint_command_file)"
+}
+
 main() {
   uninstall_bindings
+  uninstall_alacritty_config
   reload_hyprland
-  printf 'Uninstalled omarchy-scripts keybindings.\n'
+  printf 'Uninstalled omarchy-scripts keybindings and personal configurations.\n'
 }
 
 main "$@"

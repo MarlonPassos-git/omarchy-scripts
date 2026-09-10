@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+"""Open terminal file hints in Neovim and delegate other links to the desktop."""
+
+import os
+from pathlib import Path
+import subprocess
+import sys
+from urllib.parse import unquote, urlsplit
+
+
+def main():
+    target = sys.argv[1]
+    # Path hints include their delimiters because the DFA has no lookaround.
+    candidate = target.lstrip(' \t\r\n' + '"\'`(<[=:')
+    if candidate.startswith(('/', '~/')):
+        target = candidate.rstrip(' \t\r\n' + '"\'`()[]{}<>:,;!?.')
+    if target.startswith('file:'):
+        uri = urlsplit(target)
+        if uri.netloc not in ('', 'localhost'):
+            os.execvp('xdg-open', ['xdg-open', target])
+        target = unquote(uri.path)
+    elif not target.startswith(('/', '~/')):
+        os.execvp('xdg-open', ['xdg-open', target])
+
+    path = Path(target).expanduser()
+    # Sentence punctuation can be included in a terminal's regex match.
+    if not path.exists():
+        trimmed = Path(str(path).rstrip('.,;!?'))
+        if trimmed.exists():
+            path = trimmed
+    if not path.exists():
+        subprocess.run(['notify-send', 'Arquivo não encontrado', str(path)], check=False)
+        return 1
+    if path.is_dir():
+        os.execvp('xdg-open', ['xdg-open', str(path)])
+    os.execvp('alacritty', ['alacritty', '-e', 'nvim', '--', str(path)])
+
+
+if __name__ == '__main__':
+    sys.exit(main())
