@@ -1,5 +1,5 @@
 # script	title	description	modifiers	key	dependencies	args
-omarchy-codex-notify	Codex notifications	Show completion notifications and focus the originating terminal on click.	NONE	NONE	python3,omarchy,hyprctl	-
-omarchy-capture-active-window	Active window screenshot	Capture the active Hyprland window, save it to Pictures, copy it to the clipboard, and notify with the saved path.	SUPER SHIFT	PRINT	hyprctl,jq,grim,wl-copy,notify-send
-omarchy-layout-main-two-stack	Main + side stack layout	Toggle the current workspace between dwindle and a master layout with the focused window on the left and the other windows stacked on the right.	SUPER ALT	L	hyprctl,jq,notify-send
-omarchy-open-terminal-hint	Alacritty terminal hint	Open terminal file hints in Neovim and delegate directories and links to the desktop.	NONE	NONE	python3,alacritty,nvim,xdg-open,notify-send	-
+omarchy-codex-notify.ts	Codex notifications	Show completion notifications and focus the originating terminal on click.	NONE	NONE	node>=24,omarchy,hyprctl	-
+omarchy-capture-active-window.sh	Active window screenshot	Capture the active Hyprland window, save it to Pictures, copy it to the clipboard, and notify with the saved path.	SUPER SHIFT	PRINT	hyprctl,jq,grim,wl-copy,notify-send
+omarchy-layout-main-two-stack.sh	Main + side stack layout	Toggle the current workspace between dwindle and a master layout with the focused window on the left and the other windows stacked on the right.	SUPER ALT	L	hyprctl,jq,notify-send
+omarchy-open-terminal-hint.ts	Alacritty terminal hint	Open terminal file hints in Neovim and delegate directories and links to the desktop.	NONE	NONE	node>=24,alacritty,nvim,xdg-open,notify-send	-

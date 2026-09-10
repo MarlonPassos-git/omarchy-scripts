@@ -9,12 +9,13 @@ import re
 import shutil
 import sys
 import tomllib
+from typing import Any
 
 
-def replace_setting(text, section, key, value):
+def replace_setting(text: str, section: str, key: str, value: str) -> str:
     lines = text.splitlines(keepends=True)
-    current = ""
-    section_start = 0 if not section else None
+    current: str | None = ""
+    section_start: int | None = 0 if not section else None
     for index, line in enumerate(lines):
         header = re.match(r"^\s*\[([^\[\]]+)\]\s*(?:#.*)?$", line)
         if header:
@@ -40,31 +41,43 @@ def replace_setting(text, section, key, value):
     return "".join(lines)
 
 
-def main():
+def notification_commands(root: Path) -> tuple[list[str], list[str]]:
+    handler = root / "src" / "omarchy-codex-notify.ts"
+    current = ["node", str(handler)]
+    legacy = ["python3", str(root / "src" / "omarchy-codex-notify")]
+    return current, legacy
+
+
+def main() -> int:
     root = Path(__file__).resolve().parent.parent
-    handler = root / "src" / "omarchy-codex-notify"
     config = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "config.toml"
     original = config.read_text() if config.exists() else ""
-    settings = tomllib.loads(original)
-    command = ["python3", str(handler)]
-    if settings.get("notify") not in (None, command):
-        sys.exit("notify: another integration is configured; preserve or migrate it before installing")
+    settings: dict[str, Any] = tomllib.loads(original)
+    command, legacy_command = notification_commands(root)
+    if settings.get("notify") not in (None, command, legacy_command):
+        print(
+            "notify: another integration is configured; preserve or migrate it before installing",
+            file=sys.stderr,
+        )
+        return 1
     updated = replace_setting(original, "", "notify", json.dumps(command))
     # Completion goes through notify; retain terminal alerts for approvals.
     updated = replace_setting(updated, "tui", "notifications", '["approval-requested"]')
-    parsed = tomllib.loads(updated)
+    parsed: dict[str, Any] = tomllib.loads(updated)
     if parsed.get("notify") != command or parsed.get("tui", {}).get("notifications") != ["approval-requested"]:
-        sys.exit("config.toml: unsupported key layout; configuration was not changed")
+        print("config.toml: unsupported key layout; configuration was not changed", file=sys.stderr)
+        return 1
     if updated == original:
         print("Codex notifications already configured.")
-        return
+        return 0
     config.parent.mkdir(parents=True, exist_ok=True)
     if config.exists():
-        backup = config.with_name(config.name + ".bak.omarchy-scripts-" + datetime.now().strftime("%Y%m%d%H%M%S%f"))
-        shutil.copy2(config, backup)
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+        shutil.copy2(config, config.with_name(f"{config.name}.bak.omarchy-scripts-{timestamp}"))
     config.write_text(updated)
     print("Codex notifications configured. Restart Codex CLI sessions to load the integration.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

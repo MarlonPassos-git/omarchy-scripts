@@ -113,7 +113,7 @@ render_binding_lines() {
 
 render_bindings_block() {
   printf '%s\n' "$BEGIN_MARKER"
-  printf '%s\n' '-- Managed by ./scripts/install. Edit src/manifest.tsv, then rerun install.'
+  printf '%s\n' '-- Managed by ./scripts/install.sh. Edit src/manifest.tsv, then rerun install.'
   printf '%s\n' '-- Keep new windows in the side stack; Omarchy promotes them to master by default.'
   printf '%s\n' 'hl.config({' '  master = {' '    new_status = "slave",' '  },' '})'
   printf '%s\n' '-- Prevent Alacritty activation requests from stealing focus.'
@@ -225,7 +225,7 @@ ensure_alacritty_import() {
 
 install_alacritty_config() {
   install_symlink "$REPO_ROOT/config/alacritty/omarchy-scripts.toml" "$(alacritty_fragment_file)"
-  install_symlink "$REPO_ROOT/src/omarchy-open-terminal-hint" "$(hint_command_file)"
+  install_symlink "$REPO_ROOT/src/omarchy-open-terminal-hint.ts" "$(hint_command_file)"
   ensure_alacritty_import
   # Replacing an imported symlink does not always trigger Alacritty's file watcher.
   touch "$(alacritty_config_file)"
