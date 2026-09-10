@@ -5,6 +5,14 @@ identifier; commits and internal maintenance are intentionally omitted.
 
 ## 2026-09-10
 
+### Added
+
+- Added symlinked personal Alacritty configuration with terminal hints that route
+  files to Neovim, directories and links to the desktop, and missing paths to
+  notifications.
+- Added a managed Hyprland rule that prevents Alacritty activation requests from
+  stealing focus through the existing generated Lua block.
+
 ### Removed
 
 - Removed the Spotify TUI commands, media controls, installer, desktop entry,
