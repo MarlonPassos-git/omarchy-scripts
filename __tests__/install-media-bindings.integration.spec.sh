@@ -63,9 +63,9 @@ exit 0'
     ALACRITTY_CONFIG_FILE="$tmpdir/alacritty.toml" \
     ALACRITTY_FRAGMENT_FILE="$tmpdir/omarchy-scripts.toml" \
     OPEN_TERMINAL_HINT_FILE="$tmpdir/omarchy-open-terminal-hint" \
-    ./scripts/install >/dev/null
-  capture_command="$(repo_command_path omarchy-capture-active-window)"
-  layout_command="$(repo_command_path omarchy-layout-main-two-stack)"
+    ./scripts/install.sh >/dev/null
+  capture_command="$(repo_command_path omarchy-capture-active-window.sh)"
+  layout_command="$(repo_command_path omarchy-layout-main-two-stack.sh)"
 
   assert_file_contains "$bindings_file" 'o.bind("SUPER + R", "Personal command", "personal-command")'
   assert_file_contains "$bindings_file" 'hl.unbind("SUPER + SHIFT + PRINT")'
@@ -78,7 +78,7 @@ exit 0'
     ALACRITTY_CONFIG_FILE="$tmpdir/alacritty.toml" \
     ALACRITTY_FRAGMENT_FILE="$tmpdir/omarchy-scripts.toml" \
     OPEN_TERMINAL_HINT_FILE="$tmpdir/omarchy-open-terminal-hint" \
-    ./scripts/install >/dev/null
+    ./scripts/install.sh >/dev/null
   assert_line_count "$bindings_file" '-- BEGIN omarchy-scripts' 1
 
   PATH="$tmpdir:$PATH" \
@@ -86,7 +86,7 @@ exit 0'
     ALACRITTY_CONFIG_FILE="$tmpdir/alacritty.toml" \
     ALACRITTY_FRAGMENT_FILE="$tmpdir/omarchy-scripts.toml" \
     OPEN_TERMINAL_HINT_FILE="$tmpdir/omarchy-open-terminal-hint" \
-    ./scripts/uninstall >/dev/null
+    ./scripts/uninstall.sh >/dev/null
   assert_file_contains "$bindings_file" 'o.bind("SUPER + R", "Personal command", "personal-command")'
   assert_file_not_contains "$bindings_file" 'omarchy-capture-active-window'
   assert_file_not_contains "$bindings_file" '-- BEGIN omarchy-scripts'

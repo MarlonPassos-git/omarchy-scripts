@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source ./src/omarchy-capture-active-window
+source ./src/omarchy-capture-active-window.sh
 
 fail() {
   printf 'not ok - %s\n' "$1" >&2

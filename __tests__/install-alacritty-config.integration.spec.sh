@@ -49,7 +49,7 @@ test_alacritty_config_symlinks() {
     ALACRITTY_CONFIG_FILE="$config" \
     ALACRITTY_FRAGMENT_FILE="$fragment" \
     OPEN_TERMINAL_HINT_FILE="$hint" \
-    ./scripts/install >/dev/null
+    ./scripts/install.sh >/dev/null
 
   touch -d '2000-01-01 00:00:00' "$config"
   PATH="$fake_bin:$PATH" \
@@ -57,12 +57,12 @@ test_alacritty_config_symlinks() {
     ALACRITTY_CONFIG_FILE="$config" \
     ALACRITTY_FRAGMENT_FILE="$fragment" \
     OPEN_TERMINAL_HINT_FILE="$hint" \
-    ./scripts/install >/dev/null
+    ./scripts/install.sh >/dev/null
 
   [[ -L "$fragment" ]] || fail "Alacritty fragment is not a symlink"
   [[ -L "$hint" ]] || fail "hint command is not a symlink"
   [[ "$(readlink -f "$fragment")" == "$PWD/config/alacritty/omarchy-scripts.toml" ]] || fail "fragment points to the wrong source"
-  [[ "$(readlink -f "$hint")" == "$PWD/src/omarchy-open-terminal-hint" ]] || fail "hint points to the wrong source"
+  [[ "$(readlink -f "$hint")" == "$PWD/src/omarchy-open-terminal-hint.ts" ]] || fail "hint points to the wrong source"
   assert_line_count "$config" '~/.config/alacritty/omarchy-scripts.toml' 1
   [[ "$(stat -c %Y "$config")" -gt 946684800 ]] || fail "Alacritty reload was not requested"
   assert_contains "$fragment" 'binding = { key = "O", mods = "Control|Shift" }'
@@ -80,7 +80,7 @@ test_alacritty_config_symlinks() {
     HYPR_BINDINGS_LUA_FILE="$bindings" \
     ALACRITTY_FRAGMENT_FILE="$fragment" \
     OPEN_TERMINAL_HINT_FILE="$hint" \
-    ./scripts/uninstall >/dev/null
+    ./scripts/uninstall.sh >/dev/null
 
   [[ ! -e "$fragment" && ! -L "$fragment" ]] || fail "fragment symlink was not removed"
   [[ ! -e "$hint" && ! -L "$hint" ]] || fail "hint symlink was not removed"
