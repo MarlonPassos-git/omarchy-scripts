@@ -1,0 +1,21 @@
+{
+  "name": "omarchy-scripts",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "npm run test:typescript && npm run test:python",
+    "test:typescript": "node --test __tests__/*.spec.ts",
+    "test:python": "python3 __tests__/install-codex-notifications.integration.spec.py",
+    "typecheck": "npm run typecheck:typescript && npm run typecheck:python",
+    "typecheck:typescript": "tsc --noEmit",
+    "typecheck:python": "pyright"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.4",
+    "pyright": "1.1.414",
+    "typescript": "7.0.2"
+  }
+}
