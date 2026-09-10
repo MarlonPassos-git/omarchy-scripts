@@ -6,11 +6,21 @@ This repository stores personal scripts used by Omarchy/Hyprland.
 
 ## Structure
 
-- Executable scripts live in `src/` and use the `omarchy-` prefix.
+- Executable scripts live in `src/`, use the `omarchy-` prefix, and keep an
+  explicit language suffix: `.ts`, `.py`, or `.sh`.
 - `src/manifest.tsv` is the source of truth for script, title, description, shortcut, and dependencies.
-- `scripts/install` installs every command in the manifest.
-- `scripts/uninstall` removes every managed keybinding.
+- `scripts/install.sh` installs every command in the manifest.
+- `scripts/uninstall.sh` removes every managed keybinding.
 - Do not create wrappers in `~/.local/bin` for this project.
+
+## Languages
+
+- Prefer TypeScript modules for application logic and execute `.ts` directly
+  with Node.js 24; do not add a build step for these scripts.
+- Use Python when its standard library provides a safer system-file integration,
+  such as TOML parsing with `tomllib`; add type annotations and keep `.py` visible.
+- Bash scripts must use the `.sh` suffix.
+- Keep type-checking tools in development dependencies and run `npm run typecheck`.
 
 ## Paths
 
@@ -48,5 +58,5 @@ This repository stores personal scripts used by Omarchy/Hyprland.
 ## Validation
 
 - Run `bash -n <script>` after editing shell scripts.
-- Run `./scripts/install` after changing the manifest or installer.
-- Run `./scripts/uninstall` after changing uninstall logic.
+- Run `./scripts/install.sh` after changing the manifest or installer.
+- Run `./scripts/uninstall.sh` after changing uninstall logic.

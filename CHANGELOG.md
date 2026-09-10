@@ -13,6 +13,13 @@ identifier; commits and internal maintenance are intentionally omitted.
 - Added a managed Hyprland rule that prevents Alacritty activation requests from
   stealing focus through the existing generated Lua block.
 
+### Changed
+
+- Migrated the Codex notification handler and Alacritty hint command to native
+  TypeScript on Node.js 24; the typed Python TOML installer now uses a `.py` suffix.
+- Renamed Bash executables with an explicit `.sh` suffix and updated installed
+  bindings to use the new paths.
+
 ### Removed
 
 - Removed the Spotify TUI commands, media controls, installer, desktop entry,
