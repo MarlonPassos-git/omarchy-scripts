@@ -46,8 +46,8 @@ repo_command_path() {
   printf '~/%s/src/%s\n' "$repo_path" "$script"
 }
 
-test_install_generates_quattro_bindings_without_media_overrides() {
-  local tmpdir bindings_file capture_command layout_command spotify_command
+test_install_generates_quattro_bindings() {
+  local tmpdir bindings_file capture_command layout_command
   tmpdir=$(mktemp -d)
   bindings_file="$tmpdir/bindings.lua"
   trap 'rm -rf "$tmpdir"' RETURN
@@ -59,24 +59,18 @@ exit 0'
 
   PATH="$tmpdir:$PATH" \
     HYPR_BINDINGS_LUA_FILE="$bindings_file" \
-    SPOTIFY_DESKTOP_FILE="$tmpdir/spotify.desktop" \
     ./scripts/install >/dev/null
   capture_command="$(repo_command_path omarchy-capture-active-window)"
   layout_command="$(repo_command_path omarchy-layout-main-two-stack)"
-  spotify_command="$(repo_command_path omarchy-spotify)"
 
   assert_file_contains "$bindings_file" 'o.bind("SUPER + R", "Personal command", "personal-command")'
   assert_file_contains "$bindings_file" 'hl.unbind("SUPER + SHIFT + PRINT")'
   assert_file_contains "$bindings_file" "o.bind(\"SUPER + SHIFT + PRINT\", \"Active window screenshot\", \"$capture_command\")"
   assert_file_contains "$bindings_file" "o.bind(\"SUPER + ALT + L\", \"Main + side stack layout\", \"$layout_command\")"
-  assert_file_contains "$bindings_file" "o.bind(\"SUPER + SHIFT + M\", \"Spotify TUI\", \"$spotify_command\")"
   assert_file_contains "$bindings_file" 'new_status = "slave"'
-  assert_file_not_contains "$bindings_file" 'omarchy-spotify-media-key'
-  assert_file_not_contains "$bindings_file" 'XF86Audio'
 
   PATH="$tmpdir:$PATH" \
     HYPR_BINDINGS_LUA_FILE="$bindings_file" \
-    SPOTIFY_DESKTOP_FILE="$tmpdir/spotify.desktop" \
     ./scripts/install >/dev/null
   assert_line_count "$bindings_file" '-- BEGIN omarchy-scripts' 1
 
@@ -86,5 +80,5 @@ exit 0'
   assert_file_not_contains "$bindings_file" '-- BEGIN omarchy-scripts'
 }
 
-test_install_generates_quattro_bindings_without_media_overrides
-printf 'ok - install Quattro bindings without media overrides\n'
+test_install_generates_quattro_bindings
+printf 'ok - install Quattro bindings\n'
