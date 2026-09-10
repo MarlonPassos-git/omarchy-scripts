@@ -5,7 +5,6 @@ BEGIN_MARKER="-- BEGIN omarchy-scripts"
 END_MARKER="-- END omarchy-scripts"
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 MANIFEST="$REPO_ROOT/src/manifest.tsv"
-SPOTIFY_DESKTOP_TEMPLATE="$REPO_ROOT/config/spotify.desktop"
 
 hypr_bindings_lua_file() {
   printf '%s\n' "${HYPR_BINDINGS_LUA_FILE:-$HOME/.config/hypr/bindings.lua}"
@@ -38,13 +37,6 @@ ensure_script_permissions() {
 
 has_binding_key() {
   [[ -n "${1:-}" && "$1" != "NONE" && "$1" != "-" ]]
-}
-
-is_quattro_binding_ready() {
-  local script="$1"
-  local key="$2"
-
-  has_binding_key "$key" && [[ "$script" != "omarchy-spotify-media-key" ]]
 }
 
 lua_escape() {
@@ -103,7 +95,7 @@ render_unbind_lines() {
 
   while IFS=$'\t' read -r script title description modifiers key dependencies args; do
     is_manifest_row "$script" || continue
-    is_quattro_binding_ready "$script" "$key" || continue
+    has_binding_key "$key" || continue
     render_lua_unbind_line "$modifiers" "$key"
   done <"$MANIFEST"
 }
@@ -113,7 +105,7 @@ render_binding_lines() {
 
   while IFS=$'\t' read -r script title description modifiers key dependencies args; do
     is_manifest_row "$script" || continue
-    is_quattro_binding_ready "$script" "$key" || continue
+    has_binding_key "$key" || continue
     render_lua_binding_line "$script" "$title" "$description" "$modifiers" "$key" "$dependencies" "$args"
   done <"$MANIFEST"
 }
@@ -155,46 +147,6 @@ backup_bindings_file() {
   cp "$file" "$file.bak.omarchy-scripts-$(date +'%Y%m%d%H%M%S')"
 }
 
-spotify_desktop_file() {
-  local default_file="$HOME/.local/share/applications/spotify.desktop"
-
-  printf '%s\n' "${SPOTIFY_DESKTOP_FILE:-$default_file}"
-}
-
-render_spotify_desktop_entry() {
-  local spotify_command="$REPO_ROOT/src/omarchy-spotify"
-  local spotify_media_key="$REPO_ROOT/src/omarchy-spotify-media-key"
-
-  sed \
-    -e "s|@SPOTIFY_COMMAND@|$spotify_command|g" \
-    -e "s|@SPOTIFY_MEDIA_KEY@|$spotify_media_key|g" \
-    "$SPOTIFY_DESKTOP_TEMPLATE"
-}
-
-backup_spotify_desktop_entry() {
-  local file="$1"
-
-  [[ -s "$file" ]] || return 0
-  cp "$file" "$file.bak.omarchy-scripts-$(date +'%Y%m%d%H%M%S')"
-}
-
-install_spotify_desktop_entry() {
-  local file tmp
-  file="$(spotify_desktop_file)"
-  tmp="$(mktemp)"
-
-  render_spotify_desktop_entry >"$tmp"
-  mkdir -p "$(dirname "$file")"
-  if [[ -f "$file" ]] && cmp -s "$tmp" "$file"; then
-    rm -f "$tmp"
-    return
-  fi
-
-  backup_spotify_desktop_entry "$file"
-  install -m 0644 "$tmp" "$file"
-  rm -f "$tmp"
-}
-
 install_bindings() {
   local file tmp
 
@@ -217,9 +169,8 @@ reload_hyprland() {
 main() {
   ensure_script_permissions
   install_bindings
-  install_spotify_desktop_entry
   reload_hyprland
-  printf 'Installed omarchy-scripts keybindings and Spotify desktop entry.\n'
+  printf 'Installed omarchy-scripts keybindings.\n'
 }
 
 main "$@"
