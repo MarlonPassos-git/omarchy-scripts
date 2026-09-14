@@ -2,7 +2,7 @@
 
 import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 export type HintAction = {
@@ -19,6 +19,17 @@ const fileSystem: FileSystem = {
   exists: existsSync,
   isDirectory: (path) => statSync(path).isDirectory(),
 };
+
+const imageExtensions = new Set([
+  ".bmp",
+  ".gif",
+  ".jpeg",
+  ".jpg",
+  ".png",
+  ".tif",
+  ".tiff",
+  ".webp",
+]);
 
 function trimFromStart(value: string, characters: string): string {
   let index = 0;
@@ -68,6 +79,9 @@ export function resolveHintAction(
   }
   if (fs.isDirectory(path)) {
     return { program: "xdg-open", args: [path] };
+  }
+  if (imageExtensions.has(extname(path).toLowerCase())) {
+    return { program: "imv", args: [path] };
   }
   return { program: "alacritty", args: ["-e", "nvim", "--", path] };
 }
