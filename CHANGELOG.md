@@ -3,6 +3,13 @@
 User-facing script changes are grouped by day. Each date is the release
 identifier; commits and internal maintenance are intentionally omitted.
 
+## 2026-09-14
+
+### Changed
+
+- Alacritty terminal hints now recognize common image paths and open them in
+  Omarchy's native `imv` viewer instead of Neovim.
+
 ## 2026-09-10
 
 ### Added
