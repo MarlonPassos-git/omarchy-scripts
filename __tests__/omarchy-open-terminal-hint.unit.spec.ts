@@ -33,6 +33,24 @@ test("routes directories and web URLs to the desktop", (context) => {
   });
 });
 
+test("routes image paths and local image URLs to imv", (context) => {
+  const directory = mkdtempSync(join(tmpdir(), "terminal-hint-"));
+  context.after(() => rmSync(directory, { recursive: true }));
+  const decoratedTarget = join(directory, "screenshot.PNG");
+  const urlTarget = join(directory, "my photo.jpg");
+  writeFileSync(decoratedTarget, "image");
+  writeFileSync(urlTarget, "image");
+
+  assert.deepEqual(resolveHintAction(`(${decoratedTarget}).`), {
+    program: "imv",
+    args: [decoratedTarget],
+  });
+  assert.deepEqual(resolveHintAction(new URL(`file://${urlTarget}`).href), {
+    program: "imv",
+    args: [urlTarget],
+  });
+});
+
 test("decodes local file URLs", (context) => {
   const directory = mkdtempSync(join(tmpdir(), "terminal-hint-"));
   context.after(() => rmSync(directory, { recursive: true }));
