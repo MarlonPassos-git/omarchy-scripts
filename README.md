@@ -75,12 +75,16 @@ Notifications use the desktop theme, the project directory name, and at most
 240 characters of the final response. Response text is escaped for notification
 markup. The icon uses `codex-desktop` when installed. Delivery does not change focus.
 The preview also appears in the desktop notification history.
-Clicking a new notification focuses the window that originated it, identified
-through its process ancestry rather than its title or project directory. In tmux,
-the click also restores the originating session, window, and pane in an attached
-terminal. This requires `hyprctl` and, when applicable, `tmux`.
-If the window has closed, the tmux client has detached, or several windows share
-one terminal PID, the click does nothing rather than selecting an unrelated window.
+When the originating window can be identified, clicking a new notification
+focuses it. For Codex running in Herdr, the handler matches the Codex thread ID
+shown in the pane's status line, then focuses that Herdr pane and its Hyprland
+window. This requires `herdr` and a visible Codex status line containing the
+thread ID. For other terminals, it uses process ancestry. In tmux, the click
+also restores the originating session, window, and pane in an attached terminal.
+This requires `hyprctl` and, when applicable, `tmux`.
+If the source cannot be identified unambiguously or its window has closed, the
+click does nothing rather than selecting an unrelated window. A closed or
+replaced Herdr pane does not prevent focusing its still-open window.
 Old notifications created without a click target cannot acquire one retroactively.
 The internal title-generation event observed in Codex CLI 0.153.4 is filtered
 by its prompt and response shape so it does not produce a second JSON toast.

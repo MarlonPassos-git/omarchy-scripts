@@ -3,6 +3,13 @@
 User-facing script changes are grouped by day. Each date is the release
 identifier; commits and internal maintenance are intentionally omitted.
 
+## 2026-09-28
+
+### Fixed
+
+- Codex notifications from Herdr now focus the originating pane and Hyprland
+  window when clicked, using the Codex thread ID to locate the correct agent.
+
 ## 2026-09-14
 
 ### Changed
