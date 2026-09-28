@@ -78,6 +78,30 @@ class Fixture {
     writeFileSync(this.clients, JSON.stringify([other, target]));
     return target;
   }
+
+  installHerdr(thread: string): void {
+    this.env.TEST_THREAD = thread;
+    this.env.TEST_CODEX_PID = String(process.pid);
+    executable(
+      join(this.directory, "herdr"),
+      `const fs = require("node:fs");
+const args = process.argv.slice(2);
+if (args[0] === "session" && args[1] === "list") {
+  console.log(JSON.stringify({ sessions: [{ name: "pessoal", running: true }] }));
+} else if (args[0] === "--session" && args[2] === "api") {
+  console.log(JSON.stringify({ result: { snapshot: { agents: [{ agent: "codex", pane_id: "w1:p2" }] } } }));
+} else if (args[0] === "--session" && args[2] === "pane" && args[3] === "read") {
+  console.log("Codex status · " + fs.readFileSync(process.env.TEST_THREAD_FILE, "utf8"));
+} else if (args[0] === "--session" && args[2] === "pane" && args[3] === "process-info") {
+  console.log(JSON.stringify({ result: { process_info: { foreground_processes: [{ name: "codex", pid: Number(process.env.TEST_CODEX_PID) }] } } }));
+} else {
+  fs.appendFileSync(process.env.TEST_ACTIONS, JSON.stringify(args) + "\\n");
+}
+`,
+    );
+    this.env.TEST_THREAD_FILE = join(this.directory, "thread.txt");
+    writeFileSync(this.env.TEST_THREAD_FILE, thread);
+  }
 }
 
 function fixtureFor(context: TestContext): Fixture {
@@ -151,6 +175,46 @@ test("click focuses the originating process", (context) => {
   assert.throws(() => readFileSync(fixture.actions));
   const click = fixture.clickNotification();
   assert.equal(click.status, 0, click.stderr);
+  assert.deepEqual(JSON.parse(readFileSync(fixture.actions, "utf8")), [
+    "dispatch",
+    'hl.dsp.focus({ window = "address:0x123" })',
+  ]);
+});
+
+test("a missing Herdr installation does not break direct terminal focus", (context) => {
+  const fixture = fixtureFor(context);
+  fixture.installTestWindows();
+  executable(join(fixture.directory, "herdr"), "process.exit(1);\n");
+  const result = fixture.run('{"type":"agent-turn-complete","thread-id":"01a0e8cb-ddfd-7bf1-84df-0daf216911d3"}');
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(fixture.notificationTarget(), {
+    window: { address: "0x123", pid: process.pid, stableId: "target" },
+  });
+});
+
+test("click finds the exact Codex thread in Herdr and focuses its pane and window", (context) => {
+  const fixture = fixtureFor(context);
+  fixture.installTestWindows();
+  const thread = "01a0e8cb-ddfd-7bf1-84df-0daf216911d3";
+  fixture.installHerdr(thread);
+  const result = fixture.run(JSON.stringify({ type: "agent-turn-complete", "thread-id": thread }));
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(fixture.notificationTarget(), {
+    window: { address: "0x123", pid: process.pid, stableId: "target" },
+    herdr: { session: "pessoal", pane: "w1:p2", thread },
+  });
+
+  const click = fixture.clickNotification();
+  assert.equal(click.status, 0, click.stderr);
+  const actions = readFileSync(fixture.actions, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  assert.deepEqual(actions, [
+    ["--session", "pessoal", "agent", "focus", "w1:p2"],
+    ["dispatch", 'hl.dsp.focus({ window = "address:0x123" })'],
+  ]);
+
+  writeFileSync(fixture.env.TEST_THREAD_FILE, "different thread");
+  writeFileSync(fixture.actions, "");
+  assert.equal(fixture.clickNotification().status, 0);
   assert.deepEqual(JSON.parse(readFileSync(fixture.actions, "utf8")), [
     "dispatch",
     'hl.dsp.focus({ window = "address:0x123" })',
