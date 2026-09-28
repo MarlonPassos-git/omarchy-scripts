@@ -24,6 +24,13 @@ type TmuxTarget = {
 type NotificationTarget = {
   window: WindowTarget;
   tmux?: TmuxTarget;
+  herdr?: HerdrTarget;
+};
+
+type HerdrTarget = {
+  session: string;
+  pane: string;
+  thread: string;
 };
 
 type TmuxPane = {
@@ -115,9 +122,69 @@ function tmuxClients(socket: string): TmuxClient[] {
   return output.split("\n").map((line) => line.split("\t") as TmuxClient);
 }
 
-export function notificationTarget(): NotificationTarget | undefined {
+function herdrPaneHasThread(session: string, pane: string, thread: string): boolean {
+  try {
+    const screen = commandOutput("herdr", "--session", session, "pane", "read", pane, "--source", "visible", "--lines", "8");
+    // Codex displays its thread ID in the bottom status line; older output may mention other threads.
+    return screen.split("\n").slice(-3).some((line) => line.includes(thread));
+  } catch {
+    return false;
+  }
+}
+
+function herdrNotificationTarget(clients: JsonObject[], thread: string): NotificationTarget | undefined {
+  const sessions: unknown = JSON.parse(commandOutput("herdr", "session", "list", "--json"));
+  if (!isObject(sessions) || !Array.isArray(sessions.sessions)) return undefined;
+  const matches: NotificationTarget[] = [];
+
+  for (const sessionInfo of sessions.sessions) {
+    if (!isObject(sessionInfo) || sessionInfo.running !== true || typeof sessionInfo.name !== "string") continue;
+    const session = sessionInfo.name;
+    let response: unknown;
+    try {
+      response = JSON.parse(commandOutput("herdr", "--session", session, "api", "snapshot"));
+    } catch {
+      continue;
+    }
+    if (!isObject(response) || !isObject(response.result) || !isObject(response.result.snapshot)) continue;
+    const agents = response.result.snapshot.agents;
+    if (!Array.isArray(agents)) continue;
+
+    for (const agent of agents) {
+      if (!isObject(agent) || agent.agent !== "codex" || typeof agent.pane_id !== "string") continue;
+      const pane = agent.pane_id;
+      if (!herdrPaneHasThread(session, pane, thread)) continue;
+
+      let processResponse: unknown;
+      try {
+        processResponse = JSON.parse(commandOutput("herdr", "--session", session, "pane", "process-info", "--pane", pane));
+      } catch {
+        continue;
+      }
+      if (!isObject(processResponse) || !isObject(processResponse.result) || !isObject(processResponse.result.process_info)) continue;
+      const processes = processResponse.result.process_info.foreground_processes;
+      if (!Array.isArray(processes)) continue;
+      const codex = processes.find((process) => isObject(process) && process.name === "codex" && typeof process.pid === "number");
+      if (!isObject(codex) || typeof codex.pid !== "number") continue;
+      const window = windowForProcess(clients, codex.pid);
+      if (window) matches.push({ window, herdr: { session, pane, thread } });
+    }
+  }
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+export function notificationTarget(payload?: JsonObject): NotificationTarget | undefined {
   try {
     const clients = parseClients(commandOutput("hyprctl", "clients", "-j"));
+    const thread = payload?.["thread-id"];
+    if (typeof thread === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(thread)) {
+      try {
+        const herdr = herdrNotificationTarget(clients, thread);
+        if (herdr) return herdr;
+      } catch {
+        // Codex can also run in terminals without Herdr installed or running.
+      }
+    }
     if (process.env.TMUX && process.env.TMUX_PANE) {
       const socket = process.env.TMUX.split(",").slice(0, -2).join(",");
       const pane = process.env.TMUX_PANE;
@@ -152,11 +219,17 @@ export function notificationTarget(): NotificationTarget | undefined {
 function isNotificationTarget(value: unknown): value is NotificationTarget {
   if (!isObject(value) || !isObject(value.window)) return false;
   const window = value.window;
-  return (
+  const validWindow = (
     typeof window.address === "string" &&
     typeof window.pid === "number" &&
     (typeof window.stableId === "string" || typeof window.stableId === "number")
   );
+  if (!validWindow) return false;
+  if (value.herdr === undefined) return true;
+  return isObject(value.herdr) &&
+    typeof value.herdr.session === "string" && /^[a-zA-Z0-9_-]+$/.test(value.herdr.session) &&
+    typeof value.herdr.pane === "string" && /^[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+$/.test(value.herdr.pane) &&
+    typeof value.herdr.thread === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value.herdr.thread);
 }
 
 export function focusNotification(target: unknown): number {
@@ -170,6 +243,14 @@ export function focusNotification(target: unknown): number {
         client.stableId === target.window.stableId,
     );
     if (!currentWindow || !/^0x[0-9a-f]+$/i.test(target.window.address)) return 0;
+
+    if (target.herdr && herdrPaneHasThread(target.herdr.session, target.herdr.pane, target.herdr.thread)) {
+      try {
+        commandOutput("herdr", "--session", target.herdr.session, "agent", "focus", target.herdr.pane);
+      } catch {
+        // A closed or detached pane must not prevent focusing its still-open window.
+      }
+    }
 
     if (target.tmux) {
       const tmux = target.tmux;
@@ -228,7 +309,7 @@ function sendNotification(payload: JsonObject): number {
   if (body.startsWith("-")) body = `\u200b${body}`;
   const iconPath = "/usr/share/icons/hicolor/256x256/apps/codex-desktop.png";
   const script = fileURLToPath(import.meta.url);
-  const target = JSON.stringify(notificationTarget() ?? null);
+  const target = JSON.stringify(notificationTarget(payload) ?? null);
   const args = [
     "notification",
     "send",
