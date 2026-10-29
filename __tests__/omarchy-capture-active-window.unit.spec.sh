@@ -54,8 +54,10 @@ printf "%s\n" "{\"at\":[11,22],\"size\":[333,444]}"'
 printf "%s\n" "png-bytes" > "$3"'
   write_fake_executable "$tmpdir/wl-copy" '#!/bin/sh
 cat > "$DEMO_CLIPBOARD_LOG"'
+  write_fake_executable "$tmpdir/omarchy" '#!/bin/sh
+printf "%s\n" "$@" > "$DEMO_NOTIFY_LOG"'
   write_fake_executable "$tmpdir/notify-send" '#!/bin/sh
-printf "%s\n" "$*" > "$DEMO_NOTIFY_LOG"'
+exit 1'
   write_fake_executable "$tmpdir/imv" '#!/bin/sh
 printf "%s\n" "imv:$*" >> "$DEMO_VIEWER_LOG"'
   write_fake_executable "$tmpdir/xdg-open" '#!/bin/sh
@@ -70,6 +72,10 @@ printf "%s\n" "xdg-open:$*" >> "$DEMO_VIEWER_LOG"'
 
   assert_equal "png-bytes" "$(cat "$clipboard_log")"
   wait_for_log "$notify_log" "Active window screenshot saved"
+  local screenshot_path
+  screenshot_path=$(find "$tmpdir/home/Pictures" -name '*.png' -print -quit)
+  [[ -n "$screenshot_path" ]] || fail "expected saved screenshot"
+  assert_equal "$(printf '%s\n' notification send 'Active window screenshot saved' "~/Pictures/${screenshot_path##*/}" -t 3000 --image "$screenshot_path")" "$(cat "$notify_log")"
   [[ ! -f $viewer_log ]] || fail "expected preview viewer not to run"
 }
 
