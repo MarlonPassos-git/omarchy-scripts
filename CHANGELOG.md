@@ -3,6 +3,13 @@
 User-facing script changes are grouped by day. Each date is the release
 identifier; commits and internal maintenance are intentionally omitted.
 
+## 2026-10-29
+
+### Changed
+
+- Alacritty terminal hints now recognize video paths, including local Jam
+  recordings, and open them in the desktop's default video player.
+
 ## 2026-09-28
 
 ### Fixed

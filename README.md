@@ -35,9 +35,11 @@ Personal configurations installed without replacing Omarchy's main Alacritty
 configuration:
 
 - `Ctrl+Shift+O` highlights URLs and local file paths printed in the terminal.
-- Images open in Omarchy's native `imv` viewer, files open in a new Alacritty
-  window with Neovim, and directories and other links open through the desktop's
-  default handler.
+- Images open in Omarchy's native `imv` viewer, videos in the default video
+  player, and other files in a new Alacritty window with Neovim. Directories and
+  other links open through the desktop's default handler.
+- To open a saved recording, press `Ctrl+Shift+O` and type the hint label shown
+  beside its path (for example, a Jam `recording.mp4`).
 - `file://` URLs, surrounding delimiters, and trailing sentence punctuation are
   normalized before a path is opened.
 - Missing paths produce a desktop notification instead of opening an empty editor.
@@ -142,7 +144,7 @@ systemctl --user enable --now omarchy-git-auto-push.timer
 | Codex notifications | - | Shows completion with the project and response preview; clicking returns to the originating terminal or tmux pane. | - | [omarchy-codex-notify.ts](src/omarchy-codex-notify.ts) | Node.js 24+, `omarchy`, `hyprctl`; `tmux` when used |
 | Active window screenshot | <img src=".github/assets/omarchy-capture-active-window.gif" alt="Active window screenshot demo" width="420"> | Captures the active Hyprland window, saves it to Pictures, copies it to the clipboard, and shows a notification with the saved path. | `Super + Shift + Print` | [omarchy-capture-active-window.sh](src/omarchy-capture-active-window.sh) | [hyprctl](https://wiki.hypr.land/Configuring/Using-hyprctl/), [jq](https://jqlang.org/), [grim](https://man.archlinux.org/man/grim.1.en), [wl-copy](https://man.archlinux.org/man/wl-copy.1.en), [notify-send](https://man.archlinux.org/man/notify-send.1.en) |
 | Main + side stack layout | <img src=".github/assets/omarchy-layout-main-two-stack.gif" alt="Main + side stack layout demo" width="420"> | Toggles the current workspace between `dwindle` and `master`, using the focused window as the main pane and stacking the other windows on the right. | `Super + Alt + L` | [omarchy-layout-main-two-stack.sh](src/omarchy-layout-main-two-stack.sh) | [hyprctl](https://wiki.hypr.land/Configuring/Using-hyprctl/), [jq](https://jqlang.org/), [notify-send](https://man.archlinux.org/man/notify-send.1.en) |
-| Alacritty terminal hint | - | Opens image hints in imv, files in Neovim, and delegates directories and links to the desktop. | `Ctrl + Shift + O` | [omarchy-open-terminal-hint.ts](src/omarchy-open-terminal-hint.ts) | Node.js 24+, Alacritty, Neovim, `imv`, `xdg-open`, `notify-send` |
+| Alacritty terminal hint | - | Opens images in imv, videos in the default player, files in Neovim, and directories and links through the desktop. | `Ctrl + Shift + O` | [omarchy-open-terminal-hint.ts](src/omarchy-open-terminal-hint.ts) | Node.js 24+, Alacritty, Neovim, `imv`, `xdg-open`, `notify-send` |
 | Scheduled Git push | `./src/omarchy-git-auto-push.sh --dry-run` | Pushes existing commits from an explicit machine-local allowlist. Work repositories protect `main` and `master` and require a same-named branch on `origin`. | - | [omarchy-git-auto-push.sh](src/omarchy-git-auto-push.sh) | [git](https://git-scm.com/), `flock` |
 
 ## License
