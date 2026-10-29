@@ -7,6 +7,8 @@ identifier; commits and internal maintenance are intentionally omitted.
 
 ### Changed
 
+- Active-window screenshots now use Omarchy's native notification with an image
+  preview, keeping capture confirmations visible during Do Not Disturb.
 - Alacritty terminal hints now recognize video paths, including local Jam
   recordings, and open them in the desktop's default video player.
 - Directory paths ending in `/` can now be clicked or selected with Alacritty
