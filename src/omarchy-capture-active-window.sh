@@ -50,7 +50,8 @@ main() {
   geometry=$(active_window_geometry)
   filepath=$(save_active_window_screenshot "$output_dir" "$geometry")
   notification_path=$(display_path "$filepath")
-  notify-send "Active window screenshot saved" "$notification_path" -t 3000 -i "$filepath"
+  # Native action confirmations remain visible while Do Not Disturb is enabled.
+  omarchy notification send "Active window screenshot saved" "$notification_path" -t 3000 --image "$filepath"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
