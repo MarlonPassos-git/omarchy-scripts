@@ -35,6 +35,8 @@ Personal configurations installed without replacing Omarchy's main Alacritty
 configuration:
 
 - `Ctrl+Shift+O` highlights URLs and local file paths printed in the terminal.
+- Click a directory path ending in `/`, such as `~/Pictures/screenshots/`, to
+  open it in the default file manager. Directory paths also support keyboard hints.
 - Images open in Omarchy's native `imv` viewer, videos in the default video
   player, and other files in a new Alacritty window with Neovim. Directories and
   other links open through the desktop's default handler.

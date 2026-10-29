@@ -9,6 +9,8 @@ identifier; commits and internal maintenance are intentionally omitted.
 
 - Alacritty terminal hints now recognize video paths, including local Jam
   recordings, and open them in the desktop's default video player.
+- Directory paths ending in `/` can now be clicked or selected with Alacritty
+  hints to open them in the default file manager.
 
 ## 2026-09-28
 
