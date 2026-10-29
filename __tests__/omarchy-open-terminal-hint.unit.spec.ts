@@ -63,6 +63,26 @@ test("decodes local file URLs", (context) => {
   });
 });
 
+test("routes decorated video paths, home paths and local URLs to the default player", (context) => {
+  const directory = mkdtempSync(join(tmpdir(), "terminal-hint-"));
+  context.after(() => rmSync(directory, { recursive: true }));
+  const target = join(directory, "recording.mp4");
+  const urlTarget = join(directory, "my recording.WEBM");
+  writeFileSync(target, "video");
+  writeFileSync(urlTarget, "video");
+
+  for (const input of [`${target};`, `(${target}).`, "~/recording.mp4"]) {
+    assert.deepEqual(resolveHintAction(input, directory), {
+      program: "xdg-open",
+      args: [target],
+    });
+  }
+  assert.deepEqual(resolveHintAction(new URL(`file://${urlTarget}`).href), {
+    program: "xdg-open",
+    args: [urlTarget],
+  });
+});
+
 test("reports missing local files without opening an editor", () => {
   assert.deepEqual(resolveHintAction("/definitely/missing/file.ts"), {
     program: "notify-send",

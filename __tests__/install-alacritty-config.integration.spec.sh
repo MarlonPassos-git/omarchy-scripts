@@ -89,4 +89,19 @@ test_alacritty_config_symlinks() {
 }
 
 test_alacritty_config_symlinks
+
+python3 - <<'PY'
+import re
+import tomllib
+from pathlib import Path
+
+config = tomllib.loads(Path("config/alacritty/omarchy-scripts.toml").read_text())
+pattern = re.compile(config["hints"]["enabled"][0]["regex"])
+for filename in ["recording.mp4", "recording.WEBM", "clip.mkv", "clip.mov"]:
+    path = f"~/.local/state/jam/record/session/{filename}"
+    output = f"Upload failed. Recording kept at {path}; run `jam record stop session` again to retry."
+    match = pattern.search(output)
+    assert match is not None and match.group().strip().rstrip(";") == path, output
+PY
+
 printf 'ok - install Alacritty configuration symlinks\n'
