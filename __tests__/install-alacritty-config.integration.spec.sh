@@ -102,6 +102,23 @@ for filename in ["recording.mp4", "recording.WEBM", "clip.mkv", "clip.mov"]:
     output = f"Upload failed. Recording kept at {path}; run `jam record stop session` again to retry."
     match = pattern.search(output)
     assert match is not None and match.group().strip().rstrip(";") == path, output
+
+for path in [
+    "~/Pictures/focus-screenzen-reference-20261029-151057/",
+    "/home/example/Pictures/focus-screenzen-reference-20261029-151057/",
+    "~/.config/",
+]:
+    for output in [path, f"({path})", f"Saved in `{path}`."]:
+        match = pattern.search(output)
+        assert match is not None, output
+        assert match.group().strip(" \t\r\n`().") == path, output
+
+for path in ["~/Pictures/screenshot.png", "~/notes/example.md"]:
+    match = pattern.search(f"({path})")
+    assert match is not None and match.group().strip("()") == path, path
+
+assert pattern.search("https://example.com/docs/").group() == "https://example.com/docs/"
+assert pattern.search("src/folder/") is None
 PY
 
 printf 'ok - install Alacritty configuration symlinks\n'
