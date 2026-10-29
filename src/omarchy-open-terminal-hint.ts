@@ -31,6 +31,19 @@ const imageExtensions = new Set([
   ".webp",
 ]);
 
+const videoExtensions = new Set([
+  ".avi",
+  ".m4v",
+  ".mkv",
+  ".mov",
+  ".mp4",
+  ".mpeg",
+  ".mpg",
+  ".ogv",
+  ".webm",
+  ".wmv",
+]);
+
 function trimFromStart(value: string, characters: string): string {
   let index = 0;
   while (index < value.length && characters.includes(value[index])) index += 1;
@@ -82,6 +95,9 @@ export function resolveHintAction(
   }
   if (imageExtensions.has(extname(path).toLowerCase())) {
     return { program: "imv", args: [path] };
+  }
+  if (videoExtensions.has(extname(path).toLowerCase())) {
+    return { program: "xdg-open", args: [path] };
   }
   return { program: "alacritty", args: ["-e", "nvim", "--", path] };
 }
