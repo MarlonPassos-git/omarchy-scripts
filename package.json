@@ -6,12 +6,13 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "npm run test:typescript && npm run test:python",
+    "test": "npm run test:typescript && npm run test:python && npm run test:shell",
     "test:typescript": "node --test __tests__/*.spec.ts",
     "test:python": "python3 __tests__/install-codex-notifications.integration.spec.py",
     "typecheck": "npm run typecheck:typescript && npm run typecheck:python",
     "typecheck:typescript": "tsc --noEmit",
-    "typecheck:python": "pyright"
+    "typecheck:python": "pyright",
+    "test:shell": "for suite in __tests__/*.spec.sh; do bash \"$suite\" || exit; done"
   },
   "devDependencies": {
     "@types/node": "24.13.4",
