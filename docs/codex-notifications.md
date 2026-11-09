@@ -1,4 +1,83 @@
-# Codex notification integration
+# Codex notifications
+
+Receive native Omarchy notifications for ready responses, completed or blocked
+goals, paused work, interruptions, execution failures, and token or usage limits.
+Questions show the first question and up to three options; their **Responder**
+button returns to Codex. Approval buttons open the original session for review.
+Buttons never answer questions or grant permissions automatically.
+
+[![Native Codex notification previews](../.github/assets/codex-notifications.png)](../.github/assets/codex-notifications.png)
+
+These are captures of real Omarchy cards with example content. Colors, borders,
+fonts, and buttons follow the desktop theme. Every type shows the Codex app icon.
+“Meta em andamento” is included as a visual reference; intermediate goal turns
+stay quiet in normal use.
+
+## Installation
+
+Install the opt-in integration:
+
+```bash
+cd ~/projects/omarchy-scripts
+npm install --omit=dev
+python3 scripts/install-codex-notifications.py
+```
+
+Requires Python 3.11+, Node.js 24+, Codex's local app-server daemon, and Omarchy's
+notification service. Validated with Codex 0.167.0 and Omarchy 4.5. The small `ws`
+runtime dependency connects to the local Unix socket; no build step or external
+notification service is needed. Do not enable Herdr's system toasts for the same
+Codex events, as that would produce a second notification source.
+
+The installer backs up changed configuration, preserves unrelated settings and
+hooks, and refuses to replace another `notify` integration. The observer starts
+immediately and at login. Restart existing Codex terminal interfaces to load the
+setting that disables duplicate terminal alerts. No Codex hook trust review or
+agent restart is required for the observer itself.
+
+## Notification behavior
+
+Normal responses show at most 240 characters of the final message. A goal's
+intermediate turns do not announce completion. Esc produces **Interrompido**;
+a paused goal without an interrupted turn produces **Meta pausada**. Failures
+remain visible until dismissed. All types respect Do Not Disturb, and an
+identified session already in focus does not show another popup.
+
+Clicking a notification returns to the originating Herdr pane, terminal, or
+tmux pane when it can be identified safely. Herdr needs a visible Codex status
+line containing the thread ID. If the thread belongs to a Herdr session without
+an attached window, **Abrir sessão** reattaches that Herdr session and selects its
+pane. Other unidentified origins open the exact Codex thread in a terminal.
+Closed or replaced known panes and windows are never replaced by an arbitrary
+focus target.
+
+## Status and previews
+
+Inspect the integration or show a harmless native preview:
+
+```bash
+node src/omarchy-codex-notify.ts --status
+node src/omarchy-codex-notify.ts --preview input
+node src/omarchy-codex-notify.ts --preview interrupted
+node src/omarchy-codex-notify.ts --preview all
+```
+
+Preview types are `response`, `progress`, `goal-complete`, `input`, `approval`,
+`blocked`, `budget`, `usage`, `interrupted`, `paused`, and `failed`. Previews use
+example content, stay out of notification history, and their buttons do not
+change any session. Expand a card to read longer questions and their options.
+
+## Recovery and removal
+
+The observer reconnects automatically when the daemon restarts. If unavailable,
+the existing `notify` command still delivers ready-response notifications;
+the richer lifecycle notifications return when the observer reconnects.
+To disconnect, run `node src/omarchy-codex-notify.ts --stop`, remove the managed
+`~/.config/omarchy/hooks/post-boot.d/omarchy-codex-notifications.sh` hook, and
+restore `notify` and `[tui].notifications` from the Codex configuration backup.
+The general uninstaller leaves this opt-in integration in place.
+
+## Integration details
 
 The opt-in installer configures the existing `notify` handler as a fallback,
 turns off terminal notifications, and installs a managed Omarchy post-boot hook.
@@ -6,7 +85,7 @@ The hook starts one detached observer per `CODEX_HOME`. It does not modify
 Codex lifecycle hooks, Herdr configuration, or Omarchy's packaged files.
 Backups of boot hooks live outside `post-boot.d/`, so Omarchy cannot execute them.
 
-## Event handling
+### Event handling
 
 The observer connects to Codex's existing local control socket using WebSocket
 transport. It only reads thread state and temporarily subscribes to pending
@@ -50,7 +129,7 @@ Omarchy's `shell/plugins/agents/assets/codex.svg`. The sender passes the asset a
 so Omarchy does not fall back to the letter C when icon-theme lookup fails.
 It does not require the Codex desktop app or state-specific font glyphs.
 
-## Focus, privacy, and recovery
+### Focus, privacy, and recovery
 
 Herdr origin discovery matches the visible thread ID, then maps the named
 session to its unique `org.omarchy.herdr-<session>` Hyprland window. Process
