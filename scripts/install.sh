@@ -146,7 +146,7 @@ trim_trailing_blank_lines() {
 backup_bindings_file() {
   local file="$1"
 
-  [[ -s "$file" ]] || return
+  [[ -s "$file" ]] || return 0
   cp "$file" "$file.bak.omarchy-scripts-$(date +'%Y%m%d%H%M%S')"
 }
 
@@ -214,7 +214,10 @@ ensure_alacritty_import() {
   tmp=$(mktemp)
   awk -v import="$ALACRITTY_IMPORT" '
     !updated && /^general\.import = \[[^]]*\][[:space:]]*$/ {
-      sub(/\][[:space:]]*$/, ", \"" import "\" ]")
+      if ($0 ~ /\[[[:space:]]*\]/)
+        sub(/\[[[:space:]]*\]/, "[ \"" import "\" ]")
+      else
+        sub(/\][[:space:]]*$/, ", \"" import "\" ]")
       updated = 1
     }
     { print }

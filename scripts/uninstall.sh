@@ -31,7 +31,7 @@ trim_trailing_blank_lines() {
 backup_bindings_file() {
   local file="$1"
 
-  [[ -s "$file" ]] || return
+  [[ -s "$file" ]] || return 0
   cp "$file" "$file.bak.omarchy-scripts-$(date +'%Y%m%d%H%M%S')"
 }
 
@@ -39,7 +39,7 @@ uninstall_bindings() {
   local file tmp
 
   file=$(hypr_bindings_lua_file)
-  [[ -f "$file" ]] || return
+  [[ -f "$file" ]] || return 0
   backup_bindings_file "$file"
   tmp=$(mktemp)
   strip_existing_bindings "$file" | trim_trailing_blank_lines >"$tmp"
@@ -65,7 +65,7 @@ remove_managed_symlink() {
   local source="$1"
   local target="$2"
 
-  [[ -L "$target" ]] || return
+  [[ -L "$target" ]] || return 0
   if [[ "$(readlink -f "$target")" != "$(readlink -f "$source")" ]]; then
     printf 'Preserved unrelated symlink: %s\n' "$target" >&2
     return
