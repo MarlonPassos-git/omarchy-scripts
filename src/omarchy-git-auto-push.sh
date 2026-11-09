@@ -18,7 +18,8 @@ repository_upstream() {
 
 canonical_push_destination() {
   local repo_root="$1" remote_name="$2" push_url canonical_url
-  push_url=$(git -C "$repo_root" remote get-url --push "$remote_name" 2>/dev/null) || return 1
+  push_url=$(git -C "$repo_root" remote get-url --push --all "$remote_name" 2>/dev/null) || return 1
+  [[ -n "$push_url" && "$push_url" != *$'\n'* ]] || return 1
   case "$push_url" in
     http://*|https://*) canonical_url="${push_url#*://}"; canonical_url="${canonical_url#*@}" ;;
     ssh://*) canonical_url="${push_url#ssh://}"; canonical_url="${canonical_url#*@}" ;;
@@ -69,7 +70,7 @@ process_repository() {
   rejection_reason=$(policy_rejection_reason "$policy_name" "$branch_name" "$upstream_name")
   [[ -z "$rejection_reason" ]] || { printf 'Skip %s: %s.\n' "$repo_root" "$rejection_reason"; return; }
   remote_name="${upstream_name%%/*}"
-  actual_destination=$(canonical_push_destination "$repo_root" "$remote_name") || { printf 'Error %s: unsupported push URL.\n' "$repo_root" >&2; return 1; }
+  actual_destination=$(canonical_push_destination "$repo_root" "$remote_name") || { printf 'Error %s: expected exactly one supported push URL.\n' "$repo_root" >&2; return 1; }
   [[ "$actual_destination" == "$expected_destination" ]] || { printf 'Error %s: destination is %s, expected %s.\n' "$repo_root" "$actual_destination" "$expected_destination" >&2; return 1; }
   push_if_ahead "$repo_root" "$branch_name" "$remote_name" "$dry_run_flag"
 }
