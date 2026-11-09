@@ -7,6 +7,14 @@ identifier; commits and internal maintenance are intentionally omitted.
 
 ### Added
 
+- Added Grammar on `Super + Alt + G` to revise Portuguese selections or clipboard
+  text with a configurable OpenAI-compatible endpoint, model and private API key.
+  Corrections preserve the author's voice and are copied and pasted only while
+  the original window remains focused. Formatting checks protect line breaks,
+  indentation, lists, links and code before replacing the text. Rich clipboard
+  copies retain the original HTML and offer plain text alongside it, using
+  Python/PySide6; Teams blank-line spacing is retained in plain text.
+
 - Codex notifications now distinguish questions, approvals, goal completion,
   paused or blocked goals, token and usage limits, interruptions, and failures.
 - Added native previews for every notification type and session-specific buttons.
