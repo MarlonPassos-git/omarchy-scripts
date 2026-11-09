@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +28,8 @@ class Fixture {
     this.env = {
       ...inherited,
       PATH: `${this.directory}:${inherited.PATH}`,
+      CODEX_HOME: this.directory,
+      XDG_RUNTIME_DIR: this.directory,
       NOTIFICATION_CAPTURE: this.capture,
       TEST_CLIENTS: this.clients,
       TEST_ACTIONS: this.actions,
@@ -58,12 +60,12 @@ class Fixture {
 
   notification(): string[] {
     const args: string[] = JSON.parse(readFileSync(this.capture, "utf8"));
-    return args.slice(0, args.indexOf("--exec"));
+    return args.slice(0, args.includes("--action") ? args.indexOf("--action") : args.indexOf("--exec"));
   }
 
   clickNotification() {
     const args: string[] = JSON.parse(readFileSync(this.capture, "utf8"));
-    const command = args.slice(args.indexOf("--exec") + 1);
+    const command = args.slice(args.includes("--action") ? args.indexOf("--action") + 2 : args.indexOf("--exec") + 1);
     return spawnSync(command[0], command.slice(1), { env: this.env, encoding: "utf8" });
   }
 
@@ -121,11 +123,11 @@ test("completion has project and escaped bounded preview", (context) => {
   assert.equal(result.status, 0, result.stderr);
   const args = fixture.notification();
   assert.deepEqual(args.slice(0, 2), ["notification", "send"]);
-  assert.equal(args.at(-2), "Codex terminou · my project");
+  assert.equal(args.at(-2), "Resposta pronta · my project");
   assert.match(args.at(-1) ?? "", /^Done &lt;b&gt;&amp; /);
   assert.match(args.at(-1) ?? "", /…$/);
   assert.ok((args.at(-1)?.length ?? Infinity) < 260);
-  assert.ok(args.some((arg) => arg.startsWith("--icon=") && arg.includes("codex-desktop")));
+  assert.ok(args.some((arg) => arg.startsWith("--icon=") && arg.endsWith("/assets/codex-symbolic.svg")));
 });
 
 test("internal title generation does not notify", (context) => {
@@ -162,7 +164,7 @@ test("dash-leading response remains notification text", (context) => {
 test("empty completion has readable fallback", (context) => {
   const fixture = fixtureFor(context);
   assert.equal(fixture.run('{"type":"agent-turn-complete"}').status, 0);
-  assert.match(fixture.notification().at(-1) ?? "", /Resposta pronta/);
+  assert.match(fixture.notification().at(-1) ?? "", /resposta|Resposta/);
 });
 
 test("click focuses the originating process", (context) => {
@@ -270,4 +272,75 @@ test("invalid payloads do not expose their contents", (context) => {
     assert.doesNotMatch(result.stderr, new RegExp(payload.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.throws(() => readFileSync(fixture.capture));
   }
+});
+
+test("previews use every native state and safe navigation buttons", (context) => {
+  const fixture = fixtureFor(context);
+  const kinds = ["response", "progress", "goal-complete", "input", "approval", "blocked", "budget", "usage", "interrupted", "paused", "failed"];
+  for (const kind of kinds) {
+    const result = fixture.run("--preview", kind);
+    assert.equal(result.status, 0, result.stderr);
+    const args: string[] = JSON.parse(readFileSync(fixture.capture, "utf8"));
+    assert.ok(args.includes("--app-name=Codex Preview"));
+    assert.ok(args.includes("--transient"));
+    assert.ok(args.some((arg) => arg.startsWith("--icon=") && arg.endsWith("/assets/codex-symbolic.svg")));
+    assert.ok(args.some((arg) => arg.startsWith("--image=") && arg.endsWith("/assets/codex-symbolic.svg")));
+    assert.ok(!args.some((arg) => arg.startsWith("--glyph=")));
+    assert.equal(args.at(-1), "--preview-action");
+    assert.equal(args.includes("--urgency=critical"), kind === "failed");
+    const click = fixture.clickNotification();
+    assert.equal(click.status, 0);
+    assert.match(click.stdout, /no session was changed/);
+  }
+  assert.throws(() => readFileSync(fixture.actions));
+});
+
+test("unknown previews and invalid thread actions do not launch commands", (context) => {
+  const fixture = fixtureFor(context);
+  assert.equal(fixture.run("--preview", "invalid").status, 2);
+  assert.equal(fixture.run("--open-thread", "--exec=malicious").status, 2);
+  assert.throws(() => readFileSync(fixture.capture));
+});
+
+test("withdraws only the ID-verified native card when its summary is unambiguous", (context) => {
+  const fixture = fixtureFor(context);
+  const store = join(fixture.directory, ".local/state/omarchy/notifications");
+  mkdirSync(store, { recursive: true });
+  const row = { app: "Codex", originalId: 42, summary: "Precisa de você · example" };
+  writeFileSync(join(store, "live.json"), JSON.stringify([row]));
+  const script = new URL("../src/omarchy-codex-notify.ts", import.meta.url).href;
+  const run = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const { closeNotice } = await import(${JSON.stringify(script)}); closeNotice(42);`], { env: { ...fixture.env, HOME: fixture.directory }, encoding: "utf8" });
+  assert.equal(run().status, 0);
+  assert.deepEqual(JSON.parse(readFileSync(fixture.capture, "utf8")), ["notification", "dismiss", row.summary]);
+  writeFileSync(fixture.capture, "unchanged");
+  writeFileSync(join(store, "live.json"), JSON.stringify([row, { ...row, originalId: 43 }]));
+  assert.equal(run().status, 0);
+  assert.equal(readFileSync(fixture.capture, "utf8"), "unchanged");
+});
+
+test("Herdr server-owned Codex processes return to the named GUI session", (context) => {
+  const fixture = fixtureFor(context);
+  const target = fixture.installTestWindows();
+  target.class = "org.omarchy.herdr-pessoal";
+  writeFileSync(fixture.clients, JSON.stringify([target]));
+  const thread = "01a0e8cb-ddfd-7bf1-84df-0daf216911d3";
+  fixture.installHerdr(thread);
+  fixture.env.TEST_CODEX_PID = "99999999";
+  assert.equal(fixture.run(JSON.stringify({ type: "agent-turn-complete", "thread-id": thread })).status, 0);
+  const origin = fixture.notificationTarget() as { herdr: unknown };
+  assert.deepEqual(origin.herdr, { session: "pessoal", pane: "w1:p2", thread });
+  assert.equal(fixture.clickNotification().status, 0);
+  const actions = readFileSync(fixture.actions, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  assert.deepEqual(actions[0], ["--session", "pessoal", "agent", "focus", "w1:p2"]);
+  assert.equal(fixture.run("--open-thread", thread).status, 0);
+});
+
+test("a headless Herdr origin reattaches Herdr instead of launching standalone Codex", (context) => {
+  const fixture = fixtureFor(context);
+  const thread = "01a0e8cb-ddfd-7bf1-84df-0daf216911d3";
+  fixture.installHerdr(thread);
+  fixture.env.TEST_CODEX_PID = "99999999";
+  assert.equal(fixture.run("--open-thread", thread).status, 0);
+  assert.deepEqual(JSON.parse(readFileSync(fixture.capture, "utf8")), ["launch", "terminal", "herdr", "--session", "pessoal"]);
+  assert.deepEqual(JSON.parse(readFileSync(fixture.actions, "utf8")), ["--session", "pessoal", "agent", "focus", "w1:p2"]);
 });
