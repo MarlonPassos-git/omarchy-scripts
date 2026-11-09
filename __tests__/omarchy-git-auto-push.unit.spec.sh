@@ -24,7 +24,7 @@ case "$1 $2" in
   'rev-parse --show-toplevel') printf '%s\n' "$repo_root" ;;
   'symbolic-ref --quiet') printf '%s\n' "$FAKE_BRANCH" ;;
   'rev-parse --abbrev-ref') printf '%s\n' "$FAKE_UPSTREAM" ;;
-  'remote get-url') printf '%s\n' "$FAKE_PUSH_URL" ;;
+  'remote get-url') [[ "$*" == 'remote get-url --push --all origin' ]] || exit 1; printf '%s\n' "$FAKE_PUSH_URL" ;;
   'rev-list --left-right') printf '%s\n' "${FAKE_DIVERGENCE:-2 0}" ;;
   'push --porcelain') printf '%s\n' "$*" >> "$FAKE_PUSH_LOG" ;;
   *) printf 'Unexpected fake Git arguments: %s\n' "$*" >&2; exit 1 ;;
@@ -78,6 +78,21 @@ test_changed_destination_is_rejected() {
   [[ ! -f "$tmpdir/push.log" ]] || fail 'changed destination reached git push'
 }
 
+test_multiple_push_destinations_are_rejected() {
+  local tmpdir output exit_code=0
+  tmpdir=$(mktemp -d)
+  trap 'rm -rf "$tmpdir"' RETURN
+  mkdir "$tmpdir/repo"
+  write_fake_git "$tmpdir/git"
+  output=$(FAKE_BRANCH=feature/demo FAKE_UPSTREAM=origin/feature/demo \
+    FAKE_PUSH_URL=$'git@bitbucket.org:sdsla/example.git\ngit@other.example:private/repo.git' \
+    FAKE_PUSH_LOG="$tmpdir/push.log" run_git_auto_push "$tmpdir" work bitbucket.org/sdsla/example) || exit_code=$?
+  [[ "$exit_code" -ne 0 ]] || fail 'multiple push URLs returned success'
+  assert_contains 'expected exactly one supported push URL' "$output"
+  [[ ! -f "$tmpdir/push.log" ]] || fail 'multiple push URLs reached git push'
+}
+
+test_multiple_push_destinations_are_rejected
 test_work_main_is_protected
 test_work_feature_dry_run_targets_same_origin_branch
 test_changed_destination_is_rejected
