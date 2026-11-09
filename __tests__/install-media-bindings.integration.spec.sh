@@ -92,5 +92,43 @@ exit 0'
   assert_file_not_contains "$bindings_file" '-- BEGIN omarchy-scripts'
 }
 
+test_empty_and_missing_personal_config() {
+  local tmpdir mode
+  tmpdir=$(mktemp -d)
+  trap 'rm -rf "$tmpdir"' RETURN
+  write_fake_executable "$tmpdir/hyprctl" '#!/bin/sh
+exit 0'
+  for mode in missing empty; do
+    (
+      export PATH="$tmpdir:$PATH"
+      export HYPR_BINDINGS_LUA_FILE="$tmpdir/$mode/bindings.lua"
+      export ALACRITTY_CONFIG_FILE="$tmpdir/$mode/alacritty.toml"
+      export ALACRITTY_FRAGMENT_FILE="$tmpdir/$mode/fragment.toml"
+      export OPEN_TERMINAL_HINT_FILE="$tmpdir/$mode/hint"
+      mkdir -p "$tmpdir/$mode"
+      [[ "$mode" != empty ]] || touch "$HYPR_BINDINGS_LUA_FILE"
+      printf '%s\n' 'general.import = []' >"$ALACRITTY_CONFIG_FILE"
+      ./scripts/install.sh >/dev/null
+      assert_file_contains "$HYPR_BINDINGS_LUA_FILE" '-- BEGIN omarchy-scripts'
+      python3 - "$ALACRITTY_CONFIG_FILE" <<'TOML'
+import sys
+import tomllib
+from pathlib import Path
+config = tomllib.loads(Path(sys.argv[1]).read_text())
+assert config["general"]["import"] == ["~/.config/alacritty/omarchy-scripts.toml"]
+TOML
+      ./scripts/uninstall.sh >/dev/null
+      ./scripts/uninstall.sh >/dev/null
+      assert_file_not_contains "$HYPR_BINDINGS_LUA_FILE" '-- BEGIN omarchy-scripts'
+      [[ ! -L "$OPEN_TERMINAL_HINT_FILE" ]] || fail 'hint remains installed'
+      [[ ! -L "$ALACRITTY_FRAGMENT_FILE" ]] || fail 'fragment remains installed'
+      export HYPR_BINDINGS_LUA_FILE="$tmpdir/$mode/absent.lua"
+      ./scripts/uninstall.sh >/dev/null
+    )
+  done
+}
+
+test_empty_and_missing_personal_config
+
 test_install_generates_quattro_bindings
 printf 'ok - install Quattro bindings\n'
