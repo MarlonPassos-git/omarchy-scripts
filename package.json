@@ -15,7 +15,11 @@
   },
   "devDependencies": {
     "@types/node": "24.13.4",
+    "@types/ws": "8.18.2",
     "pyright": "1.1.414",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "ws": "8.22.2"
   }
 }
