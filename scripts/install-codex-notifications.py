@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Configure Codex notifications using this clone; preserve unrelated TOML."""
 
+import argparse
 from datetime import datetime
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import shlex
+import subprocess
 import sys
 import tomllib
 from typing import Any
@@ -49,6 +52,9 @@ def notification_commands(root: Path) -> tuple[list[str], list[str]]:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--no-start", action="store_true", help="Configure without starting the observer")
+    args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     config = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "config.toml"
     original = config.read_text() if config.exists() else ""
@@ -61,21 +67,53 @@ def main() -> int:
         )
         return 1
     updated = replace_setting(original, "", "notify", json.dumps(command))
-    # Completion goes through notify; retain terminal alerts for approvals.
-    updated = replace_setting(updated, "tui", "notifications", '["approval-requested"]')
+    # The observer handles interaction alerts; notify remains a completion fallback.
+    updated = replace_setting(updated, "tui", "notifications", "false")
     parsed: dict[str, Any] = tomllib.loads(updated)
-    if parsed.get("notify") != command or parsed.get("tui", {}).get("notifications") != ["approval-requested"]:
+    if parsed.get("notify") != command or parsed.get("tui", {}).get("notifications") is not False:
         print("config.toml: unsupported key layout; configuration was not changed", file=sys.stderr)
         return 1
-    if updated == original:
-        print("Codex notifications already configured.")
-        return 0
-    config.parent.mkdir(parents=True, exist_ok=True)
-    if config.exists():
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-        shutil.copy2(config, config.with_name(f"{config.name}.bak.omarchy-scripts-{timestamp}"))
-    config.write_text(updated)
-    print("Codex notifications configured. Restart Codex CLI sessions to load the integration.")
+    config_root = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
+    hook = config_root / "omarchy/hooks/post-boot.d/omarchy-codex-notifications.sh"
+    hook_content = (
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        "# Managed by omarchy-scripts: Codex notifications.\n"
+        f"export CODEX_HOME={shlex.quote(str(config.parent))}\n"
+        f"exec node {shlex.quote(str(root / 'src/omarchy-codex-notify.ts'))} --start\n"
+    )
+    hook_original = hook.read_text() if hook.exists() else None
+    if hook_original is not None and "# Managed by omarchy-scripts: Codex notifications." not in hook_original:
+        print("post-boot hook: another integration owns this path; configuration was not changed", file=sys.stderr)
+        return 1
+    try:
+        dependency = subprocess.run(
+            ["node", "--input-type=module", "-e", "if (Number(process.versions.node.split('.')[0]) < 24) process.exit(1); await import('ws')"],
+            cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+        )
+    except OSError:
+        print("node: executable unavailable; expected Node.js 24+", file=sys.stderr)
+        return 1
+    if dependency.returncode:
+        print("node/ws: expected Node.js 24+ and installed ws; run npm install before installing notifications", file=sys.stderr)
+        return 1
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    if updated != original:
+        config.parent.mkdir(parents=True, exist_ok=True)
+        if config.exists():
+            shutil.copy2(config, config.with_name(f"{config.name}.bak.omarchy-scripts-{timestamp}"))
+        config.write_text(updated)
+    if hook_content != hook_original:
+        hook.parent.mkdir(parents=True, exist_ok=True)
+        if hook.exists():
+            backups = hook.parent.parent / "backups"
+            backups.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(hook, backups / f"{hook.name}.bak.omarchy-scripts-{timestamp}")
+        hook.write_text(hook_content)
+        hook.chmod(0o755)
+    if not args.no_start:
+        subprocess.run(["node", str(root / "src/omarchy-codex-notify.ts"), "--start"], cwd=root, check=True)
+    print("Codex notifications configured. " + ("Observer startup skipped (--no-start)." if args.no_start else "Observer started; it will also start at login."))
+    print("Restart Codex sessions to load terminal notification settings.")
     return 0
 
 

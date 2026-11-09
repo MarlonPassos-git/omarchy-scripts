@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 
-import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { basename } from "node:path";
+import { execFile, execFileSync, spawnSync } from "node:child_process";
+import { readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 
-type JsonObject = Record<string, unknown>;
+const runFile = promisify(execFile);
+
+import { compact, isObject, noticeKinds, noticeView } from "./lib/codex-notifications.ts";
+import type { JsonObject, Notice, NoticeKind } from "./lib/codex-notifications.ts";
+import { bridgeRequest, startObserver } from "./lib/codex-bridge.ts";
+export { compact } from "./lib/codex-notifications.ts";
 
 type WindowTarget = {
   address: string;
@@ -21,7 +28,7 @@ type TmuxTarget = {
   client_pid: number;
 };
 
-type NotificationTarget = {
+export type NotificationTarget = {
   window: WindowTarget;
   tmux?: TmuxTarget;
   herdr?: HerdrTarget;
@@ -40,10 +47,6 @@ type TmuxPane = {
 };
 
 type TmuxClient = [pid: string, name: string, session: string, activity: string];
-
-function isObject(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function commandOutput(program: string, ...args: string[]): string {
   return execFileSync(program, args, {
@@ -126,16 +129,16 @@ function herdrPaneHasThread(session: string, pane: string, thread: string): bool
   try {
     const screen = commandOutput("herdr", "--session", session, "pane", "read", pane, "--source", "visible", "--lines", "8");
     // Codex displays its thread ID in the bottom status line; older output may mention other threads.
-    return screen.split("\n").slice(-3).some((line) => line.includes(thread));
+    return screen.split("\n").slice(-8).some((line) => line.includes(thread));
   } catch {
     return false;
   }
 }
 
-function herdrNotificationTarget(clients: JsonObject[], thread: string): NotificationTarget | undefined {
+function herdrOrigins(thread: string): HerdrTarget[] {
   const sessions: unknown = JSON.parse(commandOutput("herdr", "session", "list", "--json"));
-  if (!isObject(sessions) || !Array.isArray(sessions.sessions)) return undefined;
-  const matches: NotificationTarget[] = [];
+  if (!isObject(sessions) || !Array.isArray(sessions.sessions)) return [];
+  const matches: HerdrTarget[] = [];
 
   for (const sessionInfo of sessions.sessions) {
     if (!isObject(sessionInfo) || sessionInfo.running !== true || typeof sessionInfo.name !== "string") continue;
@@ -155,22 +158,42 @@ function herdrNotificationTarget(clients: JsonObject[], thread: string): Notific
       const pane = agent.pane_id;
       if (!herdrPaneHasThread(session, pane, thread)) continue;
 
-      let processResponse: unknown;
-      try {
-        processResponse = JSON.parse(commandOutput("herdr", "--session", session, "pane", "process-info", "--pane", pane));
-      } catch {
-        continue;
-      }
-      if (!isObject(processResponse) || !isObject(processResponse.result) || !isObject(processResponse.result.process_info)) continue;
-      const processes = processResponse.result.process_info.foreground_processes;
-      if (!Array.isArray(processes)) continue;
-      const codex = processes.find((process) => isObject(process) && process.name === "codex" && typeof process.pid === "number");
-      if (!isObject(codex) || typeof codex.pid !== "number") continue;
-      const window = windowForProcess(clients, codex.pid);
-      if (window) matches.push({ window, herdr: { session, pane, thread } });
+      matches.push({ session, pane, thread });
     }
   }
-  return matches.length === 1 ? matches[0] : undefined;
+  return matches;
+}
+
+function herdrSessionWindow(clients: JsonObject[], session: string): WindowTarget | undefined {
+  // Herdr's persistent pane processes belong to its server, not its attached GUI.
+  const matches = clients.filter((client) => client.class === `org.omarchy.herdr-${session}`);
+  if (matches.length !== 1) return undefined;
+  const [window] = matches;
+  if (typeof window.address !== "string" || typeof window.pid !== "number" || (typeof window.stableId !== "string" && typeof window.stableId !== "number")) return undefined;
+  return { address: window.address, pid: window.pid, stableId: window.stableId };
+}
+
+function herdrNotificationTarget(clients: JsonObject[], thread: string): NotificationTarget | null | undefined {
+  const origins = herdrOrigins(thread);
+  if (!origins.length) return undefined;
+  if (origins.length !== 1) return null;
+  const origin = origins[0];
+  const { session, pane } = origin;
+  const attached = herdrSessionWindow(clients, session);
+  if (attached) return { window: attached, herdr: origin };
+  let processResponse: unknown;
+  try {
+    processResponse = JSON.parse(commandOutput("herdr", "--session", session, "pane", "process-info", "--pane", pane));
+  } catch {
+    return null;
+  }
+  if (!isObject(processResponse) || !isObject(processResponse.result) || !isObject(processResponse.result.process_info)) return null;
+  const processes = processResponse.result.process_info.foreground_processes;
+  if (!Array.isArray(processes)) return null;
+  const codex = processes.find((process) => isObject(process) && process.name === "codex" && typeof process.pid === "number");
+  if (!isObject(codex) || typeof codex.pid !== "number") return null;
+  const window = windowForProcess(clients, codex.pid);
+  return window ? { window, herdr: origin } : null;
 }
 
 export function notificationTarget(payload?: JsonObject): NotificationTarget | undefined {
@@ -180,6 +203,7 @@ export function notificationTarget(payload?: JsonObject): NotificationTarget | u
     if (typeof thread === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(thread)) {
       try {
         const herdr = herdrNotificationTarget(clients, thread);
+        if (herdr === null) return undefined;
         if (herdr) return herdr;
       } catch {
         // Codex can also run in terminals without Herdr installed or running.
@@ -276,11 +300,6 @@ export function focusNotification(target: unknown): number {
   return 0;
 }
 
-export function compact(text: string, limit: number): string {
-  const normalized = text.replace(/[\x00-\x1f\x7f-\x9f]/g, " ").trim().replace(/\s+/g, " ");
-  return normalized.length <= limit ? normalized : `${normalized.slice(0, limit - 1).trimEnd()}…`;
-}
-
 function escapeMarkup(text: string): string {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
@@ -299,40 +318,166 @@ export function isTitleGeneration(payload: JsonObject): boolean {
   }
 }
 
-function sendNotification(payload: JsonObject): number {
-  const cwd = typeof payload.cwd === "string" ? payload.cwd : "";
-  const response = typeof payload["last-assistant-message"] === "string" ? payload["last-assistant-message"] : "";
-  const project = compact(basename(cwd), 70);
-  const title = `Codex terminou${project ? ` · ${project}` : ""}`;
-  let body = compact(response, 240) || "Resposta pronta. Volte ao terminal quando quiser.";
-  // Keep dash-leading model output from being parsed as an Omarchy CLI option.
+type SendOptions = { target?: NotificationTarget; replaceId?: number; preview?: boolean };
+
+/** Returns the native notification ID so later states can replace the same session card. */
+export async function sendNotice(notice: Notice, options: SendOptions = {}): Promise<{ status: number; id?: number }> {
+  const view = noticeView(notice);
+  let body = escapeMarkup(view.body);
   if (body.startsWith("-")) body = `\u200b${body}`;
-  const iconPath = "/usr/share/icons/hicolor/256x256/apps/codex-desktop.png";
+  const iconPath = fileURLToPath(new URL("../assets/codex-symbolic.svg", import.meta.url));
   const script = fileURLToPath(import.meta.url);
-  const target = JSON.stringify(notificationTarget(payload) ?? null);
   const args = [
-    "notification",
-    "send",
-    "--app-name=Codex",
-    `--icon=${existsSync(iconPath) ? iconPath : "codex-desktop"}`,
-    "--urgency=normal",
-    title,
-    escapeMarkup(body),
-    "--exec",
-    process.execPath,
-    script,
-    "--focus",
-    target,
+    "notification", "send", `--app-name=${options.preview ? "Codex Preview" : "Codex"}`,
+    `--icon=${iconPath}`, `--image=${iconPath}`,
+    `--urgency=${view.urgency}`, "--print-id", `--replace-id=${options.replaceId || 0}`,
+    ...(options.preview ? ["--transient", "--expire-time=15000"] : []),
+    view.title, body,
   ];
-  const result = spawnSync("omarchy", args, { stdio: "inherit", timeout: 10_000 });
-  if (result.error) {
-    console.error(`omarchy: ${result.error.message}`);
-    return 1;
+  if (options.preview) args.push("--action", view.action, process.execPath, script, "--preview-action");
+  else if (options.target) args.push("--action", view.action, process.execPath, script, "--focus", JSON.stringify(options.target));
+  else if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(notice.thread)) {
+    args.push("--action", view.action, process.execPath, script, "--open-thread", notice.thread);
+  } else args.push("--exec", process.execPath, script, "--focus", "null");
+  try {
+    const result = await runFile("omarchy", args, { encoding: "utf8", timeout: 5_000 });
+    const id = Number.parseInt(result.stdout.trim(), 10);
+    return { status: 0, ...(Number.isSafeInteger(id) && id > 0 ? { id } : {}) };
+  } catch {
+    console.error(JSON.stringify({ component: "codex-notifications", event: "delivery_failed" }));
+    return { status: 1 };
   }
-  return result.status ?? 1;
 }
 
-export function main(args: string[]): number {
+export function closeNotice(id: number): void {
+  // Omarchy 4.5 keeps visible snapshots after D-Bus CloseNotification. Its dismiss
+  // command accepts a summary, so withdraw only an unambiguous, ID-verified row.
+  try {
+    const file = join(homedir(), ".local/state/omarchy/notifications/live.json");
+    if (statSync(file).size > 2 * 1024 * 1024) return;
+    const value: unknown = JSON.parse(readFileSync(file, "utf8"));
+    if (!Array.isArray(value)) return;
+    const rows = value.filter(isObject);
+    const row = rows.find((candidate) => candidate.app === "Codex" && candidate.originalId === id);
+    if (!row || typeof row.summary !== "string" || !row.summary) return;
+    const summary = row.summary;
+    if (rows.filter((candidate) => typeof candidate.summary === "string" && candidate.summary.includes(summary)).length !== 1) return;
+    execFile("omarchy", ["notification", "dismiss", summary], { timeout: 2_000 }, () => {});
+  } catch { /* A missing or changing native store leaves dismissal to the desktop. */ }
+}
+
+export async function targetIsFocused(target: NotificationTarget): Promise<boolean> {
+  try {
+    const active: unknown = JSON.parse((await runFile("hyprctl", ["activewindow", "-j"], { timeout: 3_000 })).stdout);
+    if (!isObject(active) || active.address !== target.window.address || active.pid !== target.window.pid || active.stableId !== target.window.stableId) return false;
+    if (target.tmux) return false;
+    if (!target.herdr) return true;
+    const snapshot: unknown = JSON.parse((await runFile("herdr", ["--session", target.herdr.session, "api", "snapshot"], { timeout: 3_000 })).stdout);
+    if (!isObject(snapshot) || !isObject(snapshot.result) || !isObject(snapshot.result.snapshot)) return false;
+    const agents = snapshot.result.snapshot.agents;
+    return Array.isArray(agents) && agents.some((agent) => isObject(agent) && agent.pane_id === target.herdr?.pane && agent.focused === true);
+  } catch { return false; }
+}
+
+export function previewNotice(kind: NoticeKind): Notice {
+  const samples: Partial<Record<NoticeKind, string>> = {
+    response: "A revisão está pronta. Confira os pontos encontrados e as sugestões na sessão.",
+    "goal-complete": "Integração concluída. As verificações passaram e o resultado está pronto para revisão.",
+    input: "Como você prefere continuar?\n1. Manter a configuração atual\n2. Aplicar a alternativa sugerida",
+    failed: "Não foi possível concluir a execução. Confira o erro e o trabalho parcial antes de tentar novamente.",
+  };
+  return { kind, thread: "preview", cwd: "projeto-exemplo", text: samples[kind] };
+}
+
+async function watch(): Promise<number> {
+  const { watchNotifications } = await import("./lib/codex-observer.ts");
+  const targets = new Map<string, { target?: NotificationTarget; checkedAt: number }>();
+  const ids = new Map<string, number>();
+  const generation = new Map<string, number>();
+  let sequence = 0;
+  const resolving = new Map<string, Promise<NotificationTarget | undefined>>();
+  const clear = (thread: string) => {
+    generation.set(thread, ++sequence);
+    const id = ids.get(thread); if (id) closeNotice(id); ids.delete(thread);
+  };
+  const resolveTarget = (thread: string): Promise<NotificationTarget | undefined> => {
+    const existing = resolving.get(thread);
+    if (existing) return existing;
+    // External process/pane probes run outside the observer's IPC event loop.
+    const pending = runFile(process.execPath, [fileURLToPath(import.meta.url), "--resolve-target", thread], { timeout: 10_000, maxBuffer: 32_768 })
+      .then(({ stdout }) => { const value: unknown = JSON.parse(stdout); return isNotificationTarget(value) ? value : undefined; })
+      .catch(() => undefined).finally(() => resolving.delete(thread));
+    resolving.set(thread, pending);
+    return pending;
+  };
+  await watchNotifications({
+    async deliver(notice) {
+      const token = ++sequence;
+      generation.set(notice.thread, token);
+      let cached = targets.get(notice.thread);
+      if (!cached || Date.now() - cached.checkedAt > 30_000) {
+        cached = { target: await resolveTarget(notice.thread), checkedAt: Date.now() };
+        targets.set(notice.thread, cached);
+        if (targets.size > 200) {
+          const oldest = targets.keys().next().value!;
+          targets.delete(oldest); generation.delete(oldest);
+        }
+      }
+      if (generation.get(notice.thread) !== token) return;
+      const target = cached.target;
+      const focused = target && await targetIsFocused(target);
+      if (generation.get(notice.thread) !== token) return;
+      if (focused) { clear(notice.thread); return; }
+      const result = await sendNotice(notice, { target, replaceId: ids.get(notice.thread) });
+      if (result.id) {
+        if (generation.get(notice.thread) !== token) closeNotice(result.id);
+        else ids.set(notice.thread, result.id);
+      }
+    },
+    closeNotice: clear,
+  });
+  return 0;
+}
+
+export async function main(args: string[]): Promise<number> {
+  if (args.length === 1) {
+    switch (args[0]) {
+      case "--watch": return watch();
+      case "--start": await startObserver(); return 0;
+      case "--stop": await bridgeRequest({ method: "stop" }); return 0;
+      case "--status": {
+        const status = await bridgeRequest({ method: "status" });
+        console.log(status ? `Observer ${status.connected ? "connected" : "reconnecting"}; ${status.threads} interactive sessions.` : "Observer is not running.");
+        return status ? 0 : 1;
+      }
+      case "--preview-action": console.log("Preview only; no session was changed."); return 0;
+    }
+  }
+  if (args.length === 2 && args[0] === "--resolve-target" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(args[1])) {
+    console.log(JSON.stringify(notificationTarget({ "thread-id": args[1] }) ?? null)); return 0;
+  }
+  if (args.length === 2 && args[0] === "--open-thread" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(args[1])) {
+    const target = notificationTarget({ "thread-id": args[1] });
+    if (target) return focusNotification(target);
+    let origins: HerdrTarget[] = [];
+    try { origins = herdrOrigins(args[1]); } catch { /* Herdr may be unavailable. */ }
+    if (origins.length > 1) return 0;
+    if (origins.length === 1) {
+      const origin = origins[0];
+      try { commandOutput("herdr", "--session", origin.session, "agent", "focus", origin.pane); }
+      catch { return 1; }
+      const result = spawnSync("omarchy", ["launch", "terminal", "herdr", "--session", origin.session], { stdio: "ignore", timeout: 5_000 });
+      return result.status ?? 1;
+    }
+    const result = spawnSync("omarchy", ["launch", "terminal", "codex", "resume", args[1]], { stdio: "ignore", timeout: 5_000 });
+    return result.status ?? 1;
+  }
+  if (args.length === 2 && args[0] === "--preview") {
+    const kinds = args[1] === "all" ? noticeKinds : noticeKinds.filter((kind) => kind === args[1]);
+    if (!kinds.length) { console.error(`preview: invalid type; expected ${noticeKinds.join(", ")}, or all`); return 2; }
+    for (const kind of kinds) { const result = await sendNotice(previewNotice(kind), { preview: true }); if (result.status) return result.status; console.log(`${kind}: ${result.id || "sent"}`); }
+    return 0;
+  }
   if (args.length === 2 && args[0] === "--focus") {
     try {
       return focusNotification(JSON.parse(args[1]));
@@ -364,7 +509,12 @@ export function main(args: string[]): number {
       return 2;
     }
   }
-  return sendNotification(payload);
+  const coverage = await bridgeRequest({ method: "completion", payload: {
+    "thread-id": payload["thread-id"], "turn-id": payload["turn-id"],
+    "last-assistant-message": typeof payload["last-assistant-message"] === "string" ? compact(payload["last-assistant-message"], 500) : "",
+  } });
+  if (coverage?.covered === true) return 0;
+  return (await sendNotice({ kind: "response", thread: typeof payload["thread-id"] === "string" ? payload["thread-id"] : "", turn: typeof payload["turn-id"] === "string" ? payload["turn-id"] : undefined, cwd: typeof payload.cwd === "string" ? payload.cwd : "", text: typeof payload["last-assistant-message"] === "string" ? payload["last-assistant-message"] : "" }, { target: notificationTarget(payload) })).status;
 }
 
-if (import.meta.main) process.exitCode = main(process.argv.slice(2));
+if (import.meta.main) process.exitCode = await main(process.argv.slice(2));
