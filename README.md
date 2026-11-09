@@ -57,52 +57,75 @@ in the repository are therefore picked up directly by Alacritty.
 
 ## Codex notifications
 
-Connect Codex CLI completion events to Omarchy's desktop notifications:
+Receive native Omarchy notifications for ready responses, completed or blocked
+goals, paused work, interruptions, execution failures, and token or usage limits.
+Questions show the first question and up to three options; their **Responder**
+button returns to Codex. Approval buttons open the original session for review.
+Buttons never answer questions or grant permissions automatically.
+
+![Native Codex notification previews](.github/assets/codex-notifications.png)
+
+These are captures of real Omarchy cards with example content. Colors, borders,
+fonts, and buttons follow the desktop theme. Every type shows the Codex app icon. “Meta em andamento” is included as a
+visual reference; intermediate goal turns stay quiet in normal use.
+
+Install the opt-in integration:
 
 ```bash
-./scripts/install-codex-notifications.py
+cd ~/projects/omarchy-scripts
+npm install --omit=dev
+python3 scripts/install-codex-notifications.py
 ```
 
-Requires Python 3.11+ for the TOML installer, Node.js 24+ for the notification
-handler, and `omarchy notification send`. Restart existing Codex CLI sessions
-after installation. The installer points `notify` in `~/.codex/config.toml`
-(or `$CODEX_HOME/config.toml`) directly to this clone, preserves unrelated
-settings, and creates a timestamped backup before changes. It refuses to replace
-another `notify` integration. Rerun it after moving the clone, first removing the
-old `notify` setting if it points to the previous location.
+Requires Python 3.11+, Node.js 24+, Codex's local app-server daemon, and Omarchy's
+notification service. Validated with Codex 0.167.0 and Omarchy 4.5. The small `ws`
+runtime dependency connects to the local Unix socket; no build step or external
+notification service is needed. Do not enable Herdr's system toasts for the same
+Codex events, as that would produce a second notification source.
 
-The TypeScript files run directly on Node.js 24 without runtime dependencies or
-a build step. Run `npm install` only when developing locally to install editor
-types and the TypeScript/Python type-checkers.
+The installer backs up changed configuration, preserves unrelated settings and
+hooks, and refuses to replace another `notify` integration. The observer starts
+immediately and at login. Restart existing Codex terminal interfaces to load the
+setting that disables duplicate terminal alerts. No Codex hook trust review or
+agent restart is required for the observer itself.
 
-Notifications use the desktop theme, the project directory name, and at most
-240 characters of the final response. Response text is escaped for notification
-markup. The icon uses `codex-desktop` when installed. Delivery does not change focus.
-The preview also appears in the desktop notification history.
-When the originating window can be identified, clicking a new notification
-focuses it. For Codex running in Herdr, the handler matches the Codex thread ID
-shown in the pane's status line, then focuses that Herdr pane and its Hyprland
-window. This requires `herdr` and a visible Codex status line containing the
-thread ID. For other terminals, it uses process ancestry. In tmux, the click
-also restores the originating session, window, and pane in an attached terminal.
-This requires `hyprctl` and, when applicable, `tmux`.
-If the source cannot be identified unambiguously or its window has closed, the
-click does nothing rather than selecting an unrelated window. A closed or
-replaced Herdr pane does not prevent focusing its still-open window.
-Old notifications created without a click target cannot acquire one retroactively.
-The internal title-generation event observed in Codex CLI 0.153.4 is filtered
-by its prompt and response shape so it does not produce a second JSON toast.
-This compatibility filter may need updating if Codex changes that internal prompt.
+Normal responses show at most 240 characters of the final message. A goal's
+intermediate turns do not announce completion. Esc produces **Interrompido**;
+a paused goal without an interrupted turn produces **Meta pausada**. Failures
+remain visible until dismissed. All types respect Do Not Disturb, and an
+identified session already in focus does not show another popup.
 
-Only completion events are supported by Codex's `notify` integration. The
-installer keeps `approval-requested` terminal notifications enabled and removes
-completion events from that channel to prevent duplicate Alacritty bell alerts.
-The Codex-specific installer does not configure Alacritty's bell or Hyprland
-focus rules; those remain independent from the personal configuration above.
+Clicking a notification returns to the originating Herdr pane, terminal, or
+tmux pane when it can be identified safely. Herdr needs a visible Codex status
+line containing the thread ID. If the thread belongs to a Herdr session without an attached window, **Abrir
+sessão** reattaches that Herdr session and selects its pane. Other unidentified
+origins open the exact Codex thread in a terminal. Closed or replaced known panes
+and windows are never replaced by an arbitrary focus target.
 
-To disconnect, remove the top-level `notify` setting and restore your previous
-`[tui].notifications` value from the backup, then restart Codex. The general
-uninstaller only removes managed keybindings; this opt-in configuration remains.
+Inspect the integration or show a harmless native preview:
+
+```bash
+node src/omarchy-codex-notify.ts --status
+node src/omarchy-codex-notify.ts --preview input
+node src/omarchy-codex-notify.ts --preview interrupted
+node src/omarchy-codex-notify.ts --preview all
+```
+
+Preview types are `response`, `progress`, `goal-complete`, `input`, `approval`,
+`blocked`, `budget`, `usage`, `interrupted`, `paused`, and `failed`. Previews use
+example content, stay out of notification history, and their buttons do not
+change any session. Expand a card to read longer questions and their options.
+
+The observer reconnects automatically when the daemon restarts. If unavailable,
+the existing `notify` command still delivers ready-response notifications;
+the richer lifecycle notifications return when the observer reconnects.
+To disconnect, run `node src/omarchy-codex-notify.ts --stop`, remove the managed
+`~/.config/omarchy/hooks/post-boot.d/omarchy-codex-notifications.sh` hook, and
+restore `notify` and `[tui].notifications` from the Codex configuration backup.
+The general uninstaller leaves this opt-in integration in place.
+
+Protocol and compatibility details are in
+[Codex notification integration](docs/codex-notifications.md).
 
 Validate without sending desktop notifications:
 
@@ -143,7 +166,7 @@ systemctl --user enable --now omarchy-git-auto-push.timer
 
 | Title | Example | Description | Shortcut | Script | Dependencies |
 | --- | --- | --- | --- | --- | --- |
-| Codex notifications | - | Shows completion with the project and response preview; clicking returns to the originating terminal or tmux pane. | - | [omarchy-codex-notify.ts](src/omarchy-codex-notify.ts) | Node.js 24+, `omarchy`, `hyprctl`; `tmux` when used |
+| Codex notifications | - | Shows response, goal, interruption, failure, and interaction notifications with buttons that return to the session. | - | [omarchy-codex-notify.ts](src/omarchy-codex-notify.ts) | Node.js 24+, Codex daemon, `ws`, `omarchy`, `hyprctl`; `tmux` when used |
 | Active window screenshot | <img src=".github/assets/omarchy-capture-active-window.gif" alt="Active window screenshot demo" width="420"> | Captures the active Hyprland window, saves it to Pictures, copies it to the clipboard, and shows a native notification with the saved path and image preview, including during Do Not Disturb. | `Super + Shift + Print` | [omarchy-capture-active-window.sh](src/omarchy-capture-active-window.sh) | [hyprctl](https://wiki.hypr.land/Configuring/Using-hyprctl/), [jq](https://jqlang.org/), [grim](https://man.archlinux.org/man/grim.1.en), [wl-copy](https://man.archlinux.org/man/wl-copy.1.en), `omarchy` |
 | Main + side stack layout | <img src=".github/assets/omarchy-layout-main-two-stack.gif" alt="Main + side stack layout demo" width="420"> | Toggles the current workspace between `dwindle` and `master`, using the focused window as the main pane and stacking the other windows on the right. | `Super + Alt + L` | [omarchy-layout-main-two-stack.sh](src/omarchy-layout-main-two-stack.sh) | [hyprctl](https://wiki.hypr.land/Configuring/Using-hyprctl/), [jq](https://jqlang.org/), [notify-send](https://man.archlinux.org/man/notify-send.1.en) |
 | Alacritty terminal hint | - | Opens images in imv, videos in the default player, files in Neovim, and directories and links through the desktop. | `Ctrl + Shift + O` | [omarchy-open-terminal-hint.ts](src/omarchy-open-terminal-hint.ts) | Node.js 24+, Alacritty, Neovim, `imv`, `xdg-open`, `notify-send` |

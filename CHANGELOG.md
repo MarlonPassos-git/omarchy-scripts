@@ -3,6 +3,25 @@
 User-facing script changes are grouped by day. Each date is the release
 identifier; commits and internal maintenance are intentionally omitted.
 
+## 2026-11-09
+
+### Added
+
+- Codex notifications now distinguish questions, approvals, goal completion,
+  paused or blocked goals, token and usage limits, interruptions, and failures.
+- Added native previews for every notification type and session-specific buttons.
+
+### Changed
+
+- Every Codex notification uses the Codex app icon; titles distinguish each state.
+- Notification clicks find named Herdr windows even when the Codex process belongs
+  to a detached server, and reattach Herdr when its window is closed.
+- Codex goal continuation turns stay quiet; ready responses no longer imply
+  that the full goal is complete. Known focused sessions suppress popups.
+- The opt-in installer starts a shared observer immediately and at login,
+  preserves unrelated configuration, and disables duplicate terminal alerts.
+  The integration now requires Codex's local daemon and the `ws` package.
+
 ## 2026-10-29
 
 ### Changed
