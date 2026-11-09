@@ -10,7 +10,7 @@ Personal scripts and integrations for [Omarchy](https://omarchy.org/) and
 | Active window screenshot | [<img src=".github/assets/omarchy-capture-active-window.gif" alt="Active window screenshot demo" width="420">](.github/assets/omarchy-capture-active-window.gif) | Captures the active Hyprland window, saves it to Pictures, copies it to the clipboard, and shows a native notification with the saved path and image preview, including during Do Not Disturb. | `Super + Shift + Print` | [omarchy-capture-active-window.sh](src/omarchy-capture-active-window.sh) | <ul><li><a href="https://wiki.hypr.land/Configuring/Using-hyprctl/">hyprctl</a></li><li><a href="https://jqlang.org/">jq</a></li><li><a href="https://man.archlinux.org/man/grim.1.en">grim</a></li><li><a href="https://man.archlinux.org/man/wl-copy.1.en">wl-copy</a></li><li><a href="https://omarchy.org/">Omarchy</a></li></ul> |
 | Main + side stack layout | [<img src=".github/assets/omarchy-layout-main-two-stack.gif" alt="Main + side stack layout demo" width="420">](.github/assets/omarchy-layout-main-two-stack.gif) | Toggles the current workspace between `dwindle` and `master`, using the focused window as the main pane and stacking the other windows on the right. | `Super + Alt + L` | [omarchy-layout-main-two-stack.sh](src/omarchy-layout-main-two-stack.sh) | <ul><li><a href="https://wiki.hypr.land/Configuring/Using-hyprctl/">hyprctl</a></li><li><a href="https://jqlang.org/">jq</a></li><li><a href="https://man.archlinux.org/man/notify-send.1.en">notify-send</a></li></ul> |
 | [Alacritty terminal hint](docs/alacritty.md) | - | Opens images in imv, videos in the default player, files in Neovim, and directories and links through the desktop. | `Ctrl + Shift + O` | [omarchy-open-terminal-hint.ts](src/omarchy-open-terminal-hint.ts) | <ul><li><a href="https://nodejs.org/en">Node.js ≥ 24</a></li><li><a href="https://alacritty.org/">Alacritty</a></li><li><a href="https://neovim.io/">Neovim</a></li><li><a href="https://man.archlinux.org/man/imv.1.en">imv</a></li><li><a href="https://man.archlinux.org/man/xdg-open.1.en">xdg-open</a></li><li><a href="https://man.archlinux.org/man/notify-send.1.en">notify-send</a></li></ul> |
-| [Grammar](docs/grammar.md) | - | Corrects Portuguese text while preserving its voice, spacing and Markdown or HTML formatting. Uses the selection or clipboard and pastes the result into the original window. | `Super + Alt + G` | [omarchy-grammar.ts](src/omarchy-grammar.ts) | Node.js ≥ 24, wl-paste, wl-copy, wtype, hyprctl, Omarchy; Python 3 and PySide6 for HTML |
+| [Grammar](docs/grammar.md) | - | Corrects Portuguese text while preserving its voice, spacing and Markdown or HTML formatting. Uses the selection or clipboard and pastes the result into the original window. Requires [installation and API configuration](docs/grammar.md#installation). | `Super + Alt + G` | [omarchy-grammar.ts](src/omarchy-grammar.ts) | Node.js ≥ 24, wl-paste, wl-copy, wtype, hyprctl, Omarchy; Python 3 and PySide6 for HTML |
 
 ## Features
 
@@ -30,8 +30,7 @@ cd ~/projects/omarchy-scripts
 ```
 
 The installer activates the command shortcuts and Alacritty terminal hints.
-[Grammar](docs/grammar.md) needs an API endpoint, model and key configured once. Codex
-notifications and scheduled Git pushes require the separate setup steps in their
+Codex notifications and scheduled Git pushes require the separate setup steps in their
 documentation.
 
 ## Uninstall

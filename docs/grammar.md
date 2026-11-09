@@ -37,6 +37,22 @@ old entry cannot restore its original HTML. Copy from the source app again to
 retain its rich formatting. HTML from an unrelated clipboard item is never
 attached to a different selected text.
 
+## Installation
+
+Install Node.js 24+, the desktop dependencies listed below, and Python/PySide6
+for rich text. From the clone, install the npm runtime dependencies before
+configuring Grammar:
+
+```bash
+cd ~/projects/omarchy-scripts
+npm install --omit=dev
+./scripts/install.sh
+```
+
+The installer activates **Super + Alt + G**. It does not install npm packages.
+Keep the clone in place: the shortcut runs its source directly. For development
+and checks, use `npm install` to include development dependencies.
+
 ## Configuration
 
 From the repository directory, run:
