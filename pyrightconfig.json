@@ -1,5 +1,5 @@
 {
-  "include": ["scripts/**/*.py", "__tests__/**/*.py"],
+  "include": ["scripts/**/*.py", "src/**/*.py", "__tests__/**/*.py"],
   "pythonVersion": "3.11",
   "typeCheckingMode": "strict"
 }
