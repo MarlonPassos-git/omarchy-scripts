@@ -21,6 +21,11 @@ identifier; commits and internal maintenance are intentionally omitted.
 
 ### Changed
 
+- Scheduled Git pushes reject remotes with multiple push URLs, preventing sends
+  to destinations outside the allowlist.
+- Installation accepts missing or empty personal bindings and empty Alacritty
+  import arrays; uninstall tolerates bindings and managed symlinks already absent.
+
 - Every Codex notification uses the Codex app icon; titles distinguish each state.
 - Notification clicks find named Herdr windows even when the Codex process belongs
   to a detached server, and reattach Herdr when its window is closed.

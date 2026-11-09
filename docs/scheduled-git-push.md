@@ -17,7 +17,8 @@ work|~/Work/example|bitbucket.org/example/example
 Paths in the real configuration must be absolute. `personal` accepts
 `main`/`master`; `work` blocks them and requires the current branch to track a
 same-named branch on `origin`. Every policy rejects detached HEAD, divergent
-branches, missing upstreams, and changed remote destinations.
+branches, missing upstreams, changed remote destinations, and remotes with
+multiple push URLs. Exactly one supported push URL is required.
 
 ## Setup
 
