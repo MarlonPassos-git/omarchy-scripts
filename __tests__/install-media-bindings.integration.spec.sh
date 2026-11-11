@@ -63,6 +63,7 @@ exit 0'
     ALACRITTY_CONFIG_FILE="$tmpdir/alacritty.toml" \
     ALACRITTY_FRAGMENT_FILE="$tmpdir/omarchy-scripts.toml" \
     OPEN_TERMINAL_HINT_FILE="$tmpdir/omarchy-open-terminal-hint" \
+    COPY_CODE_HINT_FILE="$tmpdir/omarchy-copy-code-hint" \
     ./scripts/install.sh >/dev/null
   capture_command="$(repo_command_path omarchy-capture-active-window.sh)"
   layout_command="$(repo_command_path omarchy-layout-main-two-stack.sh)"
@@ -78,6 +79,7 @@ exit 0'
     ALACRITTY_CONFIG_FILE="$tmpdir/alacritty.toml" \
     ALACRITTY_FRAGMENT_FILE="$tmpdir/omarchy-scripts.toml" \
     OPEN_TERMINAL_HINT_FILE="$tmpdir/omarchy-open-terminal-hint" \
+    COPY_CODE_HINT_FILE="$tmpdir/omarchy-copy-code-hint" \
     ./scripts/install.sh >/dev/null
   assert_line_count "$bindings_file" '-- BEGIN omarchy-scripts' 1
 
@@ -86,6 +88,7 @@ exit 0'
     ALACRITTY_CONFIG_FILE="$tmpdir/alacritty.toml" \
     ALACRITTY_FRAGMENT_FILE="$tmpdir/omarchy-scripts.toml" \
     OPEN_TERMINAL_HINT_FILE="$tmpdir/omarchy-open-terminal-hint" \
+    COPY_CODE_HINT_FILE="$tmpdir/omarchy-copy-code-hint" \
     ./scripts/uninstall.sh >/dev/null
   assert_file_contains "$bindings_file" 'o.bind("SUPER + R", "Personal command", "personal-command")'
   assert_file_not_contains "$bindings_file" 'omarchy-capture-active-window'
@@ -105,6 +108,7 @@ exit 0'
       export ALACRITTY_CONFIG_FILE="$tmpdir/$mode/alacritty.toml"
       export ALACRITTY_FRAGMENT_FILE="$tmpdir/$mode/fragment.toml"
       export OPEN_TERMINAL_HINT_FILE="$tmpdir/$mode/hint"
+      export COPY_CODE_HINT_FILE="$tmpdir/$mode/copy-hint"
       mkdir -p "$tmpdir/$mode"
       [[ "$mode" != empty ]] || touch "$HYPR_BINDINGS_LUA_FILE"
       printf '%s\n' 'general.import = []' >"$ALACRITTY_CONFIG_FILE"

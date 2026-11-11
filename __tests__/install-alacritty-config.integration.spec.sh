@@ -24,15 +24,17 @@ assert_line_count() {
 }
 
 test_alacritty_config_symlinks() {
-  local tmpdir config fragment hint bindings target capture fake_bin
+  local tmpdir config fragment hint copy_hint bindings target capture fake_bin command clipboard
   tmpdir=$(mktemp -d)
   trap 'rm -rf "$tmpdir"' RETURN
   config="$tmpdir/alacritty.toml"
   fragment="$tmpdir/alacritty/omarchy-scripts.toml"
   hint="$tmpdir/bin/omarchy-open-terminal-hint"
+  copy_hint="$tmpdir/bin/omarchy-copy-code-hint"
   bindings="$tmpdir/bindings.lua"
   target="$tmpdir/example.py"
   capture="$tmpdir/command.log"
+  clipboard="$tmpdir/clipboard.txt"
   fake_bin="$tmpdir/fake-bin"
 
   printf '%s\n' 'general.import = [ "theme.toml" ]' '' '[window]' 'opacity = 0.9' >"$config"
@@ -42,13 +44,15 @@ test_alacritty_config_symlinks() {
   printf '%s\n' 'previous command' >"$hint"
   printf '%s\n' '#!/usr/bin/env sh' 'exit 0' >"$fake_bin/hyprctl"
   printf '%s\n' '#!/usr/bin/env sh' 'printf "%s\\n" "$@" >"$COMMAND_CAPTURE"' >"$fake_bin/alacritty"
-  chmod +x "$fake_bin/hyprctl" "$fake_bin/alacritty"
+  printf '%s\n' '#!/usr/bin/env sh' 'cat >"$CLIPBOARD_CAPTURE"' >"$fake_bin/wl-copy"
+  chmod +x "$fake_bin/hyprctl" "$fake_bin/alacritty" "$fake_bin/wl-copy"
 
   PATH="$fake_bin:$PATH" \
     HYPR_BINDINGS_LUA_FILE="$bindings" \
     ALACRITTY_CONFIG_FILE="$config" \
     ALACRITTY_FRAGMENT_FILE="$fragment" \
     OPEN_TERMINAL_HINT_FILE="$hint" \
+    COPY_CODE_HINT_FILE="$copy_hint" \
     ./scripts/install.sh >/dev/null
 
   touch -d '2000-01-01 00:00:00' "$config"
@@ -57,15 +61,19 @@ test_alacritty_config_symlinks() {
     ALACRITTY_CONFIG_FILE="$config" \
     ALACRITTY_FRAGMENT_FILE="$fragment" \
     OPEN_TERMINAL_HINT_FILE="$hint" \
+    COPY_CODE_HINT_FILE="$copy_hint" \
     ./scripts/install.sh >/dev/null
 
   [[ -L "$fragment" ]] || fail "Alacritty fragment is not a symlink"
   [[ -L "$hint" ]] || fail "hint command is not a symlink"
+  [[ -L "$copy_hint" ]] || fail "code hint command is not a symlink"
   [[ "$(readlink -f "$fragment")" == "$PWD/config/alacritty/omarchy-scripts.toml" ]] || fail "fragment points to the wrong source"
   [[ "$(readlink -f "$hint")" == "$PWD/src/omarchy-open-terminal-hint.ts" ]] || fail "hint points to the wrong source"
+  [[ "$(readlink -f "$copy_hint")" == "$PWD/src/omarchy-copy-code-hint.ts" ]] || fail "code hint points to the wrong source"
   assert_line_count "$config" '~/.config/alacritty/omarchy-scripts.toml' 1
   [[ "$(stat -c %Y "$config")" -gt 946684800 ]] || fail "Alacritty reload was not requested"
   assert_contains "$fragment" 'binding = { key = "O", mods = "Control|Shift" }'
+  assert_contains "$fragment" 'binding = { key = "Y", mods = "Control|Shift" }'
   assert_contains "$fragment" 'mouse = { enabled = true, mods = "None" }'
   assert_contains "$config" 'opacity = 0.9'
   assert_contains "$bindings" 'focus_on_activate = false'
@@ -76,14 +84,32 @@ test_alacritty_config_symlinks() {
   PATH="$fake_bin:$PATH" COMMAND_CAPTURE="$capture" "$hint" "($target)."
   [[ "$(paste -sd ' ' "$capture")" == "-e nvim -- $target" ]] || fail "file hint did not open Neovim"
 
+  command="node -e 'console.log(\"Olá;  mundo\")' \"\$(touch $tmpdir/executed)\""
+  PATH="$fake_bin:$PATH" CLIPBOARD_CAPTURE="$clipboard" "$copy_hint" "  $command    │"
+  [[ "$(cat "$clipboard")" == "$command" ]] || fail "code hint changed the command"
+  [[ ! -e "$tmpdir/executed" ]] || fail "code hint executed selected text"
+  if PATH="$fake_bin:$PATH" CLIPBOARD_CAPTURE="$clipboard" "$copy_hint" $'node\nnode' 2>/dev/null; then
+    fail "code hint accepted multiple lines"
+  fi
+  [[ "$(cat "$clipboard")" == "$command" ]] || fail "invalid hint changed the clipboard"
+
+  printf '%s\n' '#!/usr/bin/env sh' 'exit 7' >"$fake_bin/wl-copy"
+  if PATH="$fake_bin:$PATH" "$copy_hint" '  pnpm run build  '; then
+    fail "code hint ignored clipboard failure"
+  else
+    [[ "$?" == 7 ]] || fail "code hint changed clipboard failure status"
+  fi
+
   PATH="$fake_bin:$PATH" \
     HYPR_BINDINGS_LUA_FILE="$bindings" \
     ALACRITTY_FRAGMENT_FILE="$fragment" \
     OPEN_TERMINAL_HINT_FILE="$hint" \
+    COPY_CODE_HINT_FILE="$copy_hint" \
     ./scripts/uninstall.sh >/dev/null
 
   [[ ! -e "$fragment" && ! -L "$fragment" ]] || fail "fragment symlink was not removed"
   [[ ! -e "$hint" && ! -L "$hint" ]] || fail "hint symlink was not removed"
+  [[ ! -e "$copy_hint" && ! -L "$copy_hint" ]] || fail "code hint symlink was not removed"
   assert_line_count "$config" '~/.config/alacritty/omarchy-scripts.toml' 1
   ! grep -Fq -- 'focus_on_activate = false' "$bindings" || fail "Alacritty focus rule was not removed"
 }
@@ -119,6 +145,26 @@ for path in ["~/Pictures/screenshot.png", "~/notes/example.md"]:
 
 assert pattern.search("https://example.com/docs/").group() == "https://example.com/docs/"
 assert pattern.search("src/folder/") is None
+
+code_hint = next(h for h in config["hints"]["enabled"] if h["binding"]["key"] == "Y")
+assert code_hint["command"] == "omarchy-copy-code-hint"
+assert code_hint["post_processing"] is False
+pattern = re.compile(code_hint["regex"])
+for output in [
+    '  pnpm run build    ',
+    'editor │  node -e \'console.log("Olá;  mundo")\'    │',
+    '  $ curl "https://example.com/"    ',
+]:
+    assert pattern.search(output) is not None, output
+for output in [
+    '  curl "https://example.com/" \\    │',
+    '  node -e "unterminated    │',
+    '  node -e "unterminated │ neighboring text "    │',
+    '  python3 <<EOF    │',
+    '  pnpm run build│',
+]:
+    assert pattern.search(output) is None, output
+assert len(pattern.findall('  pnpm run build    │  npm run test    │')) == 2
 PY
 
 printf 'ok - install Alacritty configuration symlinks\n'
