@@ -61,6 +61,10 @@ hint_command_file() {
   printf '%s\n' "${OPEN_TERMINAL_HINT_FILE:-$HOME/.local/bin/omarchy-open-terminal-hint}"
 }
 
+copy_code_hint_file() {
+  printf '%s\n' "${COPY_CODE_HINT_FILE:-$HOME/.local/bin/omarchy-copy-code-hint}"
+}
+
 remove_managed_symlink() {
   local source="$1"
   local target="$2"
@@ -76,6 +80,7 @@ remove_managed_symlink() {
 uninstall_alacritty_config() {
   remove_managed_symlink "$REPO_ROOT/config/alacritty/omarchy-scripts.toml" "$(alacritty_fragment_file)"
   remove_managed_symlink "$REPO_ROOT/src/omarchy-open-terminal-hint.ts" "$(hint_command_file)"
+  remove_managed_symlink "$REPO_ROOT/src/omarchy-copy-code-hint.ts" "$(copy_code_hint_file)"
 }
 
 main() {

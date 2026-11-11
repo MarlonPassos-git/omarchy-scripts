@@ -181,6 +181,10 @@ hint_command_file() {
   printf '%s\n' "${OPEN_TERMINAL_HINT_FILE:-$HOME/.local/bin/omarchy-open-terminal-hint}"
 }
 
+copy_code_hint_file() {
+  printf '%s\n' "${COPY_CODE_HINT_FILE:-$HOME/.local/bin/omarchy-copy-code-hint}"
+}
+
 backup_file() {
   local file="$1"
 
@@ -229,6 +233,7 @@ ensure_alacritty_import() {
 install_alacritty_config() {
   install_symlink "$REPO_ROOT/config/alacritty/omarchy-scripts.toml" "$(alacritty_fragment_file)"
   install_symlink "$REPO_ROOT/src/omarchy-open-terminal-hint.ts" "$(hint_command_file)"
+  install_symlink "$REPO_ROOT/src/omarchy-copy-code-hint.ts" "$(copy_code_hint_file)"
   ensure_alacritty_import
   # Replacing an imported symlink does not always trigger Alacritty's file watcher.
   touch "$(alacritty_config_file)"
