@@ -7,6 +7,11 @@ identifier; commits and internal maintenance are intentionally omitted.
 
 ### Added
 
+- Added beta command-copy hints on `Ctrl + Shift + Y` for recognizable one-line
+  Codex commands, both in standalone Alacritty and Herdr. Native letter labels
+  copy plain text without opening or changing panes; this requires `wl-copy`.
+  Multiline blocks and distinguishing prose remain outside the heuristic's scope.
+
 - Added Grammar on `Super + Alt + G` to revise Portuguese selections or clipboard
   text with a configurable OpenAI-compatible endpoint, model and private API key.
   Corrections preserve the author's voice and are copied and pasted only while
