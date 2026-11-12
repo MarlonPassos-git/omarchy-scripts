@@ -6,15 +6,15 @@ import test from "node:test";
 
 import { resolveHintAction } from "../src/omarchy-open-terminal-hint.ts";
 
-test("routes decorated local files to Neovim", (context) => {
+test("routes decorated local files to the desktop", (context) => {
   const directory = mkdtempSync(join(tmpdir(), "terminal-hint-"));
   context.after(() => rmSync(directory, { recursive: true }));
   const target = join(directory, "example.ts");
   writeFileSync(target, "export {};\n");
 
   assert.deepEqual(resolveHintAction(`(${target}).`), {
-    program: "alacritty",
-    args: ["-e", "nvim", "--", target],
+    program: "xdg-open",
+    args: [target],
   });
 });
 
@@ -33,7 +33,7 @@ test("routes directories and web URLs to the desktop", (context) => {
   });
 });
 
-test("routes image paths and local image URLs to imv", (context) => {
+test("routes image paths and local image URLs to the desktop", (context) => {
   const directory = mkdtempSync(join(tmpdir(), "terminal-hint-"));
   context.after(() => rmSync(directory, { recursive: true }));
   const decoratedTarget = join(directory, "screenshot.PNG");
@@ -42,11 +42,11 @@ test("routes image paths and local image URLs to imv", (context) => {
   writeFileSync(urlTarget, "image");
 
   assert.deepEqual(resolveHintAction(`(${decoratedTarget}).`), {
-    program: "imv",
+    program: "xdg-open",
     args: [decoratedTarget],
   });
   assert.deepEqual(resolveHintAction(new URL(`file://${urlTarget}`).href), {
-    program: "imv",
+    program: "xdg-open",
     args: [urlTarget],
   });
 });
@@ -58,8 +58,8 @@ test("decodes local file URLs", (context) => {
   writeFileSync(target, "export {};\n");
 
   assert.deepEqual(resolveHintAction(new URL(`file://${target}`).href), {
-    program: "alacritty",
-    args: ["-e", "nvim", "--", target],
+    program: "xdg-open",
+    args: [target],
   });
 });
 
@@ -88,4 +88,23 @@ test("reports missing local files without opening an editor", () => {
     program: "notify-send",
     args: ["Arquivo não encontrado", "/definitely/missing/file.ts"],
   });
+});
+
+for (const filename of ["report.md", "report.markdown", "document.pdf", "archive.zip", "song.mp3"]) {
+  test(`routes ${filename} to the desktop without choosing an application`, (context) => {
+    const directory = mkdtempSync(join(tmpdir(), "terminal-hint-"));
+    context.after(() => rmSync(directory, { recursive: true }));
+    const target = join(directory, filename);
+    writeFileSync(target, "example");
+
+    assert.deepEqual(resolveHintAction(`~/${filename}`, directory), {
+      program: "xdg-open",
+      args: [target],
+    });
+  });
+}
+
+test("preserves Obsidian protocol links for the desktop handler", () => {
+  const target = "obsidian://open?vault=Notes&file=example";
+  assert.deepEqual(resolveHintAction(target), { program: "xdg-open", args: [target] });
 });

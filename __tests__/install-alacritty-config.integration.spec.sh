@@ -43,9 +43,9 @@ test_alacritty_config_symlinks() {
   printf '%s\n' 'previous fragment' >"$fragment"
   printf '%s\n' 'previous command' >"$hint"
   printf '%s\n' '#!/usr/bin/env sh' 'exit 0' >"$fake_bin/hyprctl"
-  printf '%s\n' '#!/usr/bin/env sh' 'printf "%s\\n" "$@" >"$COMMAND_CAPTURE"' >"$fake_bin/alacritty"
+  printf '%s\n' '#!/usr/bin/env sh' 'printf "%s\\n" "$@" >"$COMMAND_CAPTURE"' >"$fake_bin/xdg-open"
   printf '%s\n' '#!/usr/bin/env sh' 'cat >"$CLIPBOARD_CAPTURE"' >"$fake_bin/wl-copy"
-  chmod +x "$fake_bin/hyprctl" "$fake_bin/alacritty" "$fake_bin/wl-copy"
+  chmod +x "$fake_bin/hyprctl" "$fake_bin/xdg-open" "$fake_bin/wl-copy"
 
   PATH="$fake_bin:$PATH" \
     HYPR_BINDINGS_LUA_FILE="$bindings" \
@@ -82,7 +82,7 @@ test_alacritty_config_symlinks() {
 
   printf '%s\n' "print('ok')" >"$target"
   PATH="$fake_bin:$PATH" COMMAND_CAPTURE="$capture" "$hint" "($target)."
-  [[ "$(paste -sd ' ' "$capture")" == "-e nvim -- $target" ]] || fail "file hint did not open Neovim"
+  [[ "$(paste -sd ' ' "$capture")" == "$target" ]] || fail "file hint did not use the desktop handler"
 
   command="node -e 'console.log(\"Olá;  mundo\")' \"\$(touch $tmpdir/executed)\""
   PATH="$fake_bin:$PATH" CLIPBOARD_CAPTURE="$clipboard" "$copy_hint" "  $command    │"
@@ -139,7 +139,7 @@ for path in [
         assert match is not None, output
         assert match.group().strip(" \t\r\n`().") == path, output
 
-for path in ["~/Pictures/screenshot.png", "~/notes/example.md"]:
+for path in ["~/Pictures/screenshot.png", "~/notes/example.md", "~/docs/report.pdf", "~/Music/song.mp3", "~/Downloads/archive.zip"]:
     match = pattern.search(f"({path})")
     assert match is not None and match.group().strip("()") == path, path
 
