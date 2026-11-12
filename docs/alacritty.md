@@ -8,7 +8,8 @@ replacing Omarchy's main Alacritty configuration:
   open it in the default file manager. Directory paths also support keyboard hints.
 - Files, directories, and links open through `xdg-open`, using the desktop's
   default application for each MIME type or URL protocol. This includes images,
-  videos, Markdown, PDFs, audio, archives, and `obsidian://` links.
+  videos, Markdown, PDFs, Word (`.doc`, `.docx`), PowerPoint (`.ppt`, `.pptx`),
+  audio, archives, and `obsidian://` links.
 - To open a saved recording, press `Ctrl+Shift+O` and type the hint label shown
   beside its path (for example, a Jam `recording.mp4`).
 - `file://` URLs, surrounding delimiters, and trailing sentence punctuation are

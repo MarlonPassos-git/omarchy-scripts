@@ -10,7 +10,8 @@ identifier; commits and internal maintenance are intentionally omitted.
 - Terminal hints now open all files through `xdg-open`, respecting desktop default
   applications instead of forcing images into imv and other files into Neovim.
   Neovim and imv are no longer required by the hint command. Added path hints for
-  PDFs, EPUBs, common audio formats, and archives. MIME detection on Hyprland
+  PDFs, Word documents, PowerPoint presentations, EPUBs, common audio formats,
+  and archives. MIME detection on Hyprland
   requires `perl-file-mimeinfo`.
 
 ## 2026-11-09
