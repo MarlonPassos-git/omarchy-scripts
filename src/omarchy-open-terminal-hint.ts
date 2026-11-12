@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { extname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 export type HintAction = {
@@ -12,37 +12,11 @@ export type HintAction = {
 
 type FileSystem = {
   exists(path: string): boolean;
-  isDirectory(path: string): boolean;
 };
 
 const fileSystem: FileSystem = {
   exists: existsSync,
-  isDirectory: (path) => statSync(path).isDirectory(),
 };
-
-const imageExtensions = new Set([
-  ".bmp",
-  ".gif",
-  ".jpeg",
-  ".jpg",
-  ".png",
-  ".tif",
-  ".tiff",
-  ".webp",
-]);
-
-const videoExtensions = new Set([
-  ".avi",
-  ".m4v",
-  ".mkv",
-  ".mov",
-  ".mp4",
-  ".mpeg",
-  ".mpg",
-  ".ogv",
-  ".webm",
-  ".wmv",
-]);
 
 function trimFromStart(value: string, characters: string): string {
   let index = 0;
@@ -90,16 +64,7 @@ export function resolveHintAction(
   if (!fs.exists(path)) {
     return { program: "notify-send", args: ["Arquivo não encontrado", path] };
   }
-  if (fs.isDirectory(path)) {
-    return { program: "xdg-open", args: [path] };
-  }
-  if (imageExtensions.has(extname(path).toLowerCase())) {
-    return { program: "imv", args: [path] };
-  }
-  if (videoExtensions.has(extname(path).toLowerCase())) {
-    return { program: "xdg-open", args: [path] };
-  }
-  return { program: "alacritty", args: ["-e", "nvim", "--", path] };
+  return { program: "xdg-open", args: [path] };
 }
 
 export function runHint(rawTarget: string): number {
