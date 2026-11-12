@@ -143,6 +143,16 @@ for path in ["~/Pictures/screenshot.png", "~/notes/example.md", "~/docs/report.p
     match = pattern.search(f"({path})")
     assert match is not None and match.group().strip("()") == path, path
 
+for extension in ["doc", "docx", "ppt", "pptx", "DOCX", "PPTX"]:
+    for prefix in ["~/Downloads/", "/tmp/terminal-hint/"]:
+        path = f"{prefix}example.{extension}"
+        for output in [path, f"({path})", f"Saved at `{path}`."]:
+            match = pattern.search(output)
+            assert match is not None, output
+            assert match.group().strip(" \t\r\n`().") == path, output
+
+assert pattern.search("~/Downloads/example.docx.exe") is None
+
 assert pattern.search("https://example.com/docs/").group() == "https://example.com/docs/"
 assert pattern.search("src/folder/") is None
 
