@@ -3,6 +3,16 @@
 User-facing script changes are grouped by day. Each date is the release
 identifier; commits and internal maintenance are intentionally omitted.
 
+## 2026-11-12
+
+### Changed
+
+- Terminal hints now open all files through `xdg-open`, respecting desktop default
+  applications instead of forcing images into imv and other files into Neovim.
+  Neovim and imv are no longer required by the hint command. Added path hints for
+  PDFs, EPUBs, common audio formats, and archives. MIME detection on Hyprland
+  requires `perl-file-mimeinfo`.
+
 ## 2026-11-09
 
 ### Added

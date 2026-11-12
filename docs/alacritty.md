@@ -6,9 +6,9 @@ replacing Omarchy's main Alacritty configuration:
 - `Ctrl+Shift+O` highlights URLs and local file paths printed in the terminal.
 - Click a directory path ending in `/`, such as `~/Pictures/screenshots/`, to
   open it in the default file manager. Directory paths also support keyboard hints.
-- Images open in Omarchy's native `imv` viewer, videos in the default video
-  player, and other files in a new Alacritty window with Neovim. Directories and
-  other links open through the desktop's default handler.
+- Files, directories, and links open through `xdg-open`, using the desktop's
+  default application for each MIME type or URL protocol. This includes images,
+  videos, Markdown, PDFs, audio, archives, and `obsidian://` links.
 - To open a saved recording, press `Ctrl+Shift+O` and type the hint label shown
   beside its path (for example, a Jam `recording.mp4`).
 - `file://` URLs, surrounding delimiters, and trailing sentence punctuation are
@@ -47,6 +47,26 @@ in the repository are therefore picked up directly by Alacritty.
 The [copy handler](../src/omarchy-copy-code-hint.ts) is also symlinked at
 `~/.local/bin/omarchy-copy-code-hint`; it requires `wl-copy`. The general installer
 enables both hint shortcuts, and the uninstaller removes both command symlinks.
+
+## Default applications
+
+The hint command follows the desktop associations instead of selecting an editor
+or viewer itself. Change them in the file manager's **Open With** settings or with
+`xdg-mime`. For example, to open Markdown in Omawrite:
+
+```bash
+xdg-mime default omawrite.desktop text/markdown
+xdg-mime default omawrite.desktop text/x-markdown
+xdg-mime query default text/markdown
+```
+
+On Hyprland, install `perl-file-mimeinfo` so `xdg-open` detects registered MIME
+types such as Markdown instead of treating them as plain text.
+
+These are personal desktop settings; the installer does not change them. The
+chosen application must be installed. Text paths must match a recognized hint
+extension or directory; terminal hyperlinks are also supported. Obsidian links
+use the registered `obsidian://` handler and are passed through unchanged.
 
 ## Removal
 
