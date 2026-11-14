@@ -3,6 +3,15 @@
 User-facing script changes are grouped by day. Each date is the release
 identifier; commits and internal maintenance are intentionally omitted.
 
+## 2026-11-14
+
+### Changed
+
+- Codex notification clicks return to existing terminals and Herdr panes across
+  workspaces, recognize truncated thread IDs in narrow Herdr panes, and find
+  standalone daemon sessions by their unique task title. Unidentified or closed
+  origins no longer open another terminal or duplicate the Codex session.
+
 ## 2026-11-12
 
 ### Changed

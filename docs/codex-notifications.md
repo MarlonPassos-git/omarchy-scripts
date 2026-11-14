@@ -45,11 +45,11 @@ identified session already in focus does not show another popup.
 
 Clicking a notification returns to the originating Herdr pane, terminal, or
 tmux pane when it can be identified safely. Herdr needs a visible Codex status
-line containing the thread ID. If the thread belongs to a Herdr session without
-an attached window, **Abrir sessão** reattaches that Herdr session and selects its
-pane. Other unidentified origins open the exact Codex thread in a terminal.
-Closed or replaced known panes and windows are never replaced by an arbitrary
-focus target.
+line containing the thread ID or a sufficiently long truncated prefix.
+Standalone daemon sessions use the unique task title in the terminal window.
+The existing window is focused even in another workspace or a hidden scratchpad.
+If the origin is closed or ambiguous, clicking leaves the desktop unchanged;
+it never opens another terminal or resumes a duplicate Codex session.
 
 ## Status and previews
 
@@ -131,14 +131,19 @@ It does not require the Codex desktop app or state-specific font glyphs.
 
 ### Focus, privacy, and recovery
 
-Herdr origin discovery matches the visible thread ID, then maps the named
+Herdr origin discovery matches the status-line thread ID, including a truncated
+prefix of at least 24 characters in narrow panes, then maps the named
 session to its unique `org.omarchy.herdr-<session>` Hyprland window. Process
 ancestry remains a fallback for older attached layouts; persistent pane processes
 may belong to a detached Herdr server and cannot identify its GUI by ancestry. Results, including misses, are cached briefly. Clicking
 revalidates the window address, PID, and stable identity; tmux also revalidates
-the originating client and pane. A known Herdr origin without an attached window reattaches its named session
-with `omarchy launch terminal herdr --session <name>` after selecting the pane.
-Other unidentified origins can open the exact Codex thread in a terminal.
+the originating client and pane. Standalone terminals owned by a shared Codex
+daemon are identified by the task name and project in their window title; both
+the loaded task and terminal must match uniquely. Working spinners are ignored.
+Focus returns to the existing window across workspaces, including scratchpads,
+and selects the Herdr pane or tmux pane when identified. Clicks never launch a
+terminal or resume a second copy of the task. Closed or ambiguous origins leave
+the desktop unchanged.
 
 Focused-session suppression requires both the actual active Hyprland window and,
 for Herdr, the focused pane. Multiplexed tmux sessions conservatively keep their
