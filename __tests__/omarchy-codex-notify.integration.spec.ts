@@ -3,7 +3,11 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
+import { createServer } from "node:http";
+import { once } from "node:events";
+import { promisify } from "node:util";
+import { WebSocketServer } from "ws";
 import test from "node:test";
 import type { TestContext } from "node:test";
 
@@ -335,12 +339,93 @@ test("Herdr server-owned Codex processes return to the named GUI session", (cont
   assert.equal(fixture.run("--open-thread", thread).status, 0);
 });
 
-test("a headless Herdr origin reattaches Herdr instead of launching standalone Codex", (context) => {
+test("a headless Herdr origin never opens another terminal", (context) => {
   const fixture = fixtureFor(context);
   const thread = "01a0e8cb-ddfd-7bf1-84df-0daf216911d3";
   fixture.installHerdr(thread);
   fixture.env.TEST_CODEX_PID = "99999999";
   assert.equal(fixture.run("--open-thread", thread).status, 0);
-  assert.deepEqual(JSON.parse(readFileSync(fixture.capture, "utf8")), ["launch", "terminal", "herdr", "--session", "pessoal"]);
-  assert.deepEqual(JSON.parse(readFileSync(fixture.actions, "utf8")), ["--session", "pessoal", "agent", "focus", "w1:p2"]);
+  assert.throws(() => readFileSync(fixture.capture));
+  assert.throws(() => readFileSync(fixture.actions));
+});
+
+test("a truncated Codex status returns to the Herdr pane across workspaces", (context) => {
+  const fixture = fixtureFor(context);
+  const target = fixture.installTestWindows();
+  writeFileSync(fixture.clients, JSON.stringify([{ ...target, class: "org.omarchy.herdr-pessoal", workspace: { id: -99, name: "special:scratchpad" } }]));
+  const thread = "01a0e8cb-ddfd-7bf1-84df-0daf216911d3";
+  fixture.installHerdr(thread);
+  writeFileSync(fixture.env.TEST_THREAD_FILE, thread.slice(0, 27) + "…");
+  assert.equal(fixture.run("--open-thread", thread).status, 0);
+  const actions = readFileSync(fixture.actions, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  assert.deepEqual(actions, [
+    ["--session", "pessoal", "agent", "focus", "w1:p2"],
+    ["dispatch", 'hl.dsp.focus({ window = "address:0x123" })'],
+  ]);
+  assert.throws(() => readFileSync(fixture.capture));
+});
+
+test("unidentified threads never launch a new terminal", (context) => {
+  const fixture = fixtureFor(context);
+  fixture.installTestWindows();
+  executable(join(fixture.directory, "herdr"), "process.exit(1);\n");
+  assert.equal(fixture.run("--open-thread", "01a0e8cb-ddfd-7bf1-84df-0daf216911d3").status, 0);
+  assert.throws(() => readFileSync(fixture.capture));
+  assert.throws(() => readFileSync(fixture.actions));
+});
+
+test("short UUID prefixes and UUIDs in prose do not identify a Herdr origin", (context) => {
+  const fixture = fixtureFor(context);
+  const thread = "01a0e8cb-ddfd-7bf1-84df-0daf216911d3";
+  fixture.installHerdr(thread);
+  fixture.env.TEST_CODEX_PID = "99999999";
+  for (const text of [thread.slice(0, 18) + "…", `mentioned thread ${thread}`]) {
+    writeFileSync(fixture.env.TEST_THREAD_FILE, text);
+    assert.equal(fixture.run("--open-thread", thread).status, 0);
+    assert.throws(() => readFileSync(fixture.actions));
+    assert.throws(() => readFileSync(fixture.capture));
+  }
+});
+
+test("daemon notifications find standalone terminals by a unique task title", async (context) => {
+  const fixture = fixtureFor(context);
+  executable(join(fixture.directory, "herdr"), "process.exit(1);\n");
+  const thread = "01a0e8cb-ddfd-7bf1-84df-0daf216911d3";
+  const target = { address: "0x123", pid: 99_999_999, stableId: "target", class: "Alacritty", title: "⠼ Fix notifications | example", workspace: { id: 8, name: "8" } };
+  writeFileSync(fixture.clients, JSON.stringify([target]));
+  const threads = [{ id: thread, name: "Fix notifications", cwd: "/tmp/example" }];
+  const server = createServer();
+  const websocket = new WebSocketServer({ server });
+  context.after(async () => {
+    for (const client of websocket.clients) client.terminate();
+    await new Promise<void>((resolve) => websocket.close(() => server.close(() => resolve())));
+  });
+  websocket.on("connection", (client) => client.on("message", (bytes) => {
+    const message = JSON.parse(bytes.toString());
+    if (message.id === undefined) return;
+    let result = {};
+    if (message.method === "thread/loaded/list") result = { data: threads.map((entry) => entry.id), nextCursor: null };
+    if (message.method === "thread/read") result = { thread: threads.find((entry) => entry.id === message.params.threadId) };
+    client.send(JSON.stringify({ id: message.id, result }));
+  }));
+  mkdirSync(join(fixture.directory, "app-server-control"));
+  server.listen(join(fixture.directory, "app-server-control/app-server-control.sock"));
+  await once(server, "listening");
+  const run = (...args: string[]) => promisify(execFile)(process.execPath, [join(ROOT, "src/omarchy-codex-notify.ts"), ...args], { env: fixture.env, timeout: 5_000 });
+  const resolved = await run("--resolve-target", thread);
+  assert.deepEqual(JSON.parse(resolved.stdout), { window: { address: target.address, pid: target.pid, stableId: target.stableId } });
+  await run("--open-thread", thread);
+  assert.deepEqual(JSON.parse(readFileSync(fixture.actions, "utf8")), ["dispatch", 'hl.dsp.focus({ window = "address:0x123" })']);
+  assert.throws(() => readFileSync(fixture.capture));
+
+  writeFileSync(fixture.actions, "");
+  threads.push({ ...threads[0], id: "01a0e8cb-ddfd-7bf1-84df-0daf216911d4" });
+  await run("--open-thread", thread);
+  assert.equal(readFileSync(fixture.actions, "utf8"), "");
+  assert.throws(() => readFileSync(fixture.capture));
+  threads.pop();
+  writeFileSync(fixture.clients, JSON.stringify([target, { ...target, address: "0x456" }]));
+  await run("--open-thread", thread);
+  assert.equal(readFileSync(fixture.actions, "utf8"), "");
+  assert.throws(() => readFileSync(fixture.capture));
 });
