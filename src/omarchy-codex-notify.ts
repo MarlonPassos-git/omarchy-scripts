@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execFile, execFileSync, spawnSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
@@ -12,6 +12,7 @@ const runFile = promisify(execFile);
 import { compact, isObject, noticeKinds, noticeView } from "./lib/codex-notifications.ts";
 import type { JsonObject, Notice, NoticeKind } from "./lib/codex-notifications.ts";
 import { bridgeRequest, startObserver } from "./lib/codex-bridge.ts";
+import { terminalThreadWindow } from "./lib/codex-terminal.ts";
 export { compact } from "./lib/codex-notifications.ts";
 
 type WindowTarget = {
@@ -128,8 +129,12 @@ function tmuxClients(socket: string): TmuxClient[] {
 function herdrPaneHasThread(session: string, pane: string, thread: string): boolean {
   try {
     const screen = commandOutput("herdr", "--session", session, "pane", "read", pane, "--source", "visible", "--lines", "8");
-    // Codex displays its thread ID in the bottom status line; older output may mention other threads.
-    return screen.split("\n").slice(-8).some((line) => line.includes(thread));
+    // Narrow panes truncate the status-line UUID. Ignore prose and short prefixes.
+    return screen.split("\n").slice(-8).some((line) => {
+      if (!line.includes("Context") && !line.includes("Codex status")) return false;
+      const identity = line.match(/(?:·\s*|Codex status\s*)([0-9a-f-]{24,36})(…)?\s*$/i);
+      return identity !== null && (identity[2] ? thread.startsWith(identity[1]) : identity[1] === thread);
+    });
   } catch {
     return false;
   }
@@ -196,7 +201,7 @@ function herdrNotificationTarget(clients: JsonObject[], thread: string): Notific
   return window ? { window, herdr: origin } : null;
 }
 
-export function notificationTarget(payload?: JsonObject): NotificationTarget | undefined {
+export function notificationTarget(payload?: JsonObject, useProcessOrigin = true): NotificationTarget | undefined {
   try {
     const clients = parseClients(commandOutput("hyprctl", "clients", "-j"));
     const thread = payload?.["thread-id"];
@@ -209,6 +214,7 @@ export function notificationTarget(payload?: JsonObject): NotificationTarget | u
         // Codex can also run in terminals without Herdr installed or running.
       }
     }
+    if (!useProcessOrigin) return undefined;
     if (process.env.TMUX && process.env.TMUX_PANE) {
       const socket = process.env.TMUX.split(",").slice(0, -2).join(",");
       const pane = process.env.TMUX_PANE;
@@ -236,6 +242,19 @@ export function notificationTarget(payload?: JsonObject): NotificationTarget | u
     return window ? { window } : undefined;
   } catch {
     // Notifications still arrive when no unambiguous local window is available.
+    return undefined;
+  }
+}
+
+async function resolveThreadTarget(thread: string): Promise<NotificationTarget | undefined> {
+  // The observer and click handler are not descendants of the originating TUI.
+  const target = notificationTarget({ "thread-id": thread }, false);
+  if (target) return target;
+  try {
+    const clients = parseClients(commandOutput("hyprctl", "clients", "-j"));
+    const window = await terminalThreadWindow(clients, thread);
+    return window ? { window } : undefined;
+  } catch {
     return undefined;
   }
 }
@@ -454,23 +473,13 @@ export async function main(args: string[]): Promise<number> {
     }
   }
   if (args.length === 2 && args[0] === "--resolve-target" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(args[1])) {
-    console.log(JSON.stringify(notificationTarget({ "thread-id": args[1] }) ?? null)); return 0;
+    console.log(JSON.stringify(await resolveThreadTarget(args[1]) ?? null)); return 0;
   }
   if (args.length === 2 && args[0] === "--open-thread" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(args[1])) {
-    const target = notificationTarget({ "thread-id": args[1] });
+    const target = await resolveThreadTarget(args[1]);
     if (target) return focusNotification(target);
-    let origins: HerdrTarget[] = [];
-    try { origins = herdrOrigins(args[1]); } catch { /* Herdr may be unavailable. */ }
-    if (origins.length > 1) return 0;
-    if (origins.length === 1) {
-      const origin = origins[0];
-      try { commandOutput("herdr", "--session", origin.session, "agent", "focus", origin.pane); }
-      catch { return 1; }
-      const result = spawnSync("omarchy", ["launch", "terminal", "herdr", "--session", origin.session], { stdio: "ignore", timeout: 5_000 });
-      return result.status ?? 1;
-    }
-    const result = spawnSync("omarchy", ["launch", "terminal", "codex", "resume", args[1]], { stdio: "ignore", timeout: 5_000 });
-    return result.status ?? 1;
+    console.error(JSON.stringify({ component: "codex-notifications", event: "origin_unavailable" }));
+    return 0;
   }
   if (args.length === 2 && args[0] === "--preview") {
     const kinds = args[1] === "all" ? noticeKinds : noticeKinds.filter((kind) => kind === args[1]);
